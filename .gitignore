@@ -171,5 +171,5 @@ cython_debug/
 .pypirc
 
 #folders
-pgadmin-data
+pgadmin
 local_pgdata

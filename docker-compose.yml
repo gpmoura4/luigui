@@ -1,11 +1,14 @@
-# version: "3.8"
+networks:
+  rag-to-sql:
+    driver: bridge
+
 services:
-  db:
+  pgvector_db:
     hostname: pgvector_db
-    container_name: pgvector_db_container
+    container_name: pgvector_db
     image: ankane/pgvector
     ports:
-      - 5438:5432
+      - 5438:5438
     restart: unless-stopped
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
@@ -15,6 +18,8 @@ services:
       - PGPORT=5438
     volumes:
       - ./local_pgdata:/var/lib/postgresql/data
+    networks:
+      - rag-to-sql
   pgadmin:
     image: dpage/pgadmin4
     container_name: pgadmin4_container
@@ -25,4 +30,6 @@ services:
       - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
       - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
     volumes:
-      - ./pgadmin-data:/var/lib/pgadmin
+      - ./pgadmin:/var/lib/pgadmin
+    networks:
+      - rag-to-sql
