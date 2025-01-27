@@ -8,8 +8,9 @@ from django.db import models
 # email do user
 # 
 class Database(models.Model):
-    user = models.CharField(max_length=200)
+    name = models.CharField(max_length=255, verbose_name='Database Name')
+    username = models.CharField(max_length=255, verbose_name='Database Username')
+    password = models.CharField(max_length=255, verbose_name='Database Hashed Password')
+    port = models.PositiveIntegerField(verbose_name='Database Port')
+    host = models.CharField(max_length=255, verbose_name='Database Host')
 
-    db_name = models.CharField(max_length=200)
-
-    db_url_acess = models.CharField(max_length=500)
