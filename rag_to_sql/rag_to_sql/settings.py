@@ -78,11 +78,11 @@ WSGI_APPLICATION = "rag_to_sql.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-         "NAME": "sample",
-        "USER": "postgres",
-        "PASSWORD": "1002",
+        "NAME": "vector",
+        "USER": "user",
+        "PASSWORD": "pass",
         "HOST": "localhost",
-        "PORT": "5432",
+        "PORT": "5438",
     }
 }
 
