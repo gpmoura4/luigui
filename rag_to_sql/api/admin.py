@@ -1,3 +1,7 @@
 from django.contrib import admin
+from api.models import Database
 
-# Register your models here.
+
+@admin.register(Database)
+class DatabaseAdmin(admin.ModelAdmin):
+   pass

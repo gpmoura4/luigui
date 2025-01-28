@@ -1,12 +1,7 @@
 from django.db import models
+from django.contrib.auth.hashers import make_password, check_password
 
-# Create your models here.
 
-# o que o usuario precisa pra cadastrar o banco
-# senha 
-# link do banco?
-# email do user
-# 
 class Database(models.Model):
     name = models.CharField(max_length=255, verbose_name='Database Name')
     username = models.CharField(max_length=255, verbose_name='Database Username')
@@ -14,3 +9,11 @@ class Database(models.Model):
     port = models.PositiveIntegerField(verbose_name='Database Port')
     host = models.CharField(max_length=255, verbose_name='Database Host')
 
+    def __str__(self):
+        return self.name
+
+    def set_password(self, raw_password):
+        self.hashed_password = make_password(raw_password)
+
+    def check_password(self, raw_password):
+        return check_password(raw_password, self.hashed_password)
