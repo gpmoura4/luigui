@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from api.models import Database
+from api.models import Database, Table
 
 class DatabaseSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -25,3 +25,12 @@ class DatabaseSerializer(serializers.ModelSerializer):
         database.save()
         
         return database
+    
+class TableSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+    class Meta:
+        model = Table
+        fields = [
+                "name", 
+                "db_id"
+                ]

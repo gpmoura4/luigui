@@ -17,3 +17,11 @@ class Database(models.Model):
 
     def check_password(self, raw_password):
         return check_password(raw_password, self.password)
+
+class Table(models.Model):
+    db_id = models.ForeignKey(Database, on_delete=models.CASCADE)
+    name = models.CharField(max_length=255, verbose_name='Table Name')
+
+    def __str__(self):
+        return self.name
+    
