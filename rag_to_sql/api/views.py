@@ -3,8 +3,8 @@ from django.http import Http404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from api.models import Database
-from api.serializer import  DatabaseSerializer
+from api.models import Database, Table
+from api.serializer import  DatabaseSerializer, TableSerializer
 
 
 class DatabaseList(APIView):
@@ -13,15 +13,10 @@ class DatabaseList(APIView):
         serializer = DatabaseSerializer(databases, many=True)
         return Response(serializer.data)
 
+
     def post(self, request, format=None):
         serializer = DatabaseSerializer(data = request.data)
         if serializer.is_valid():
-            dbName = DatabaseSerializer.Meta.fields[0]
-            print("O NOME É: ",dbName)
-            # db = DatabaseSerializer.Meta()
-            # db.name = serializer.validated_data.get('name', db.name)
-            # db.username = serializer.validated_data.get('username', db.username)
-            
             serializer.save()
             return Response(serializer.data, status = status.HTTP_201_CREATED)
         return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)    
@@ -50,3 +45,57 @@ class DatabaseDetail(APIView):
         database = self.get_object(pk)
         database.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+class TableList(APIView):    
+    def post(self, request, db_id, format=None):
+        try: 
+            database = Database.objects.get(id=db_id)
+        except:
+            return Response({"ERROR":"Database not found"}, status = status.HTTP_404_NOT_FOUND)    
+        data = request.data 
+        data["db_id"] = database.id
+        serializer = TableSerializer(data = data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status = status.HTTP_201_CREATED)
+        return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)    
+
+    def get(self, request, db_id, format=None):
+        # Buscar o id do db atual e listar todas as tabelas desse id
+        tables = Table.objects.filter(db_id=db_id)
+        serializer = TableSerializer(tables, many=True)
+        return Response(serializer.data)
+
+
+
+class TableDetail(APIView):
+    def put(self, request, db_id, pk,  format=None):
+        try: 
+            database = Database.objects.get(id=db_id)
+        except:
+            return Response({"ERROR":"Database not found"}, status = status.HTTP_404_NOT_FOUND)    
+        data = request.data 
+        data["db_id"] = database.id
+        
+        
+        table = self.get_object(pk)
+        serializer = TableSerializer(table, data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def delete(self, request, db_id, pk, format=None):
+        table = self.get_object(pk)
+        table.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    def get_object(self, pk):
+        try:
+            return Table.objects.get(pk=pk)
+        except Table.DoesNotExist:
+            raise Http404
+        
+    def get(self, request, db_id, pk, format=None):
+        table = self.get_object(pk)
+        serializer = TableSerializer(table)
+        return Response(serializer.data)
