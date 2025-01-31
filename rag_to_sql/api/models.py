@@ -10,7 +10,7 @@ class Database(models.Model):
     host = models.CharField(max_length=255, verbose_name='Database Host')
 
     def __str__(self):
-        return self.name
+        return str(self.id)
 
     def set_password(self, raw_password):
         self.password = make_password(raw_password)

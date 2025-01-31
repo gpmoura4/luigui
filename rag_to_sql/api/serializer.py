@@ -27,7 +27,6 @@ class DatabaseSerializer(serializers.ModelSerializer):
         return database
     
 class TableSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True)
     class Meta:
         model = Table
         fields = [

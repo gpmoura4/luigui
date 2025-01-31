@@ -46,14 +46,13 @@ class DatabaseDetail(APIView):
         database.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-class TableList(APIView):
-    
+class TableList(APIView):    
     def post(self, request, db_id, format=None):
         try: 
             database = Database.objects.get(id=db_id)
         except:
             return Response({"ERROR":"Database not found"}, status = status.HTTP_404_NOT_FOUND)    
-        data = request.data
+        data = request.data 
         data["db_id"] = database.id
         serializer = TableSerializer(data = data)
         if serializer.is_valid():
@@ -61,26 +60,42 @@ class TableList(APIView):
             return Response(serializer.data, status = status.HTTP_201_CREATED)
         return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)    
 
-    def get_object(self, pk):
-        try:
-            return Table.objects.get(pk=pk)
-        except Table.DoesNotExist:
-            raise Http404
-
-    def get(self, request, pk, format=None):
-        table = self.get_object(pk)
-        serializer = DatabaseSerializer(table)
+    def get(self, request, db_id, format=None):
+        # Buscar o id do db atual e listar todas as tabelas desse id
+        tables = Table.objects.filter(db_id=db_id)
+        serializer = TableSerializer(tables, many=True)
         return Response(serializer.data)
 
-    def put(self, request, pk, format=None):
+
+
+class TableDetail(APIView):
+    def put(self, request, db_id, pk,  format=None):
+        try: 
+            database = Database.objects.get(id=db_id)
+        except:
+            return Response({"ERROR":"Database not found"}, status = status.HTTP_404_NOT_FOUND)    
+        data = request.data 
+        data["db_id"] = database.id
+        
+        
         table = self.get_object(pk)
-        serializer = TableSerializer(table, data=request.data)
+        serializer = TableSerializer(table, data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    def delete(self, request, pk, format=None):
+    def delete(self, request, db_id, pk, format=None):
         table = self.get_object(pk)
         table.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    def get_object(self, pk):
+        try:
+            return Table.objects.get(pk=pk)
+        except Table.DoesNotExist:
+            raise Http404
+        
+    def get(self, request, db_id, pk, format=None):
+        table = self.get_object(pk)
+        serializer = TableSerializer(table)
+        return Response(serializer.data)
