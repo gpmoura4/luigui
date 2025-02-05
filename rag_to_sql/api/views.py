@@ -99,3 +99,24 @@ class TableDetail(APIView):
         table = self.get_object(pk)
         serializer = TableSerializer(table)
         return Response(serializer.data)
+
+
+class QuestionAnswerList(APIView):    
+    def post(self, request, db_id, format=None):
+        try: 
+            database = Database.objects.get(id=db_id)
+        except:
+            return Response({"ERROR":"Database not found"}, status = status.HTTP_404_NOT_FOUND)    
+        data = request.data 
+        data["db_id"] = database.id
+        serializer = TableSerializer(data = data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status = status.HTTP_201_CREATED)
+        return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)    
+
+    def get(self, request, db_id, format=None):
+        # Buscar o id do db atual e listar todas as tabelas desse id
+        tables = Table.objects.filter(db_id=db_id)
+        serializer = TableSerializer(tables, many=True)
+        return Response(serializer.data)
