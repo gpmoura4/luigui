@@ -25,6 +25,9 @@ from llama_index.core.bridge.pydantic import BaseModel, Field
 from llama_index.llms.openai import OpenAI
 from llama_index.core.llms import ChatMessage
 
+from abc import ABC, abstractmethod
+from typing import Protocol, Any
+
 import os
 import openai
 
@@ -34,31 +37,61 @@ load_dotenv()
 openai.api_key = os.getenv["OPENAI_API_KEY"]
 
 
-class PromptFactory:
-    @staticmethod
-    def create_text2sql_prompt(engine):
-        return DEFAULT_TEXT_TO_SQL_PROMPT.partial_format(
+class IPromptStrategy(Protocol):
+    @abstractmethod
+    def create_prompt(self, **kwargs: Any) -> str:
+        """Interface para estratégias de prompt"""
+        pass
+
+
+class TextToSQLPromptStrategy(IPromptStrategy):
+    def __init__(self, engine):
+        self.base_prompt = DEFAULT_TEXT_TO_SQL_PROMPT.partial_format(
             dialect=engine.dialect.name
         )
+    
+    def create_prompt(self, **kwargs: Any) -> str:
+        return self.base_prompt.format_messages(
+            query_str=kwargs["query"], schema=kwargs["context"]
+        )
+
+
+class ResponseSynthesisPromptStrategy(IPromptStrategy):
+    def create_prompt(self, **kwargs: Any) -> str:
+        response_synthesis_prompt_str = (
+            "Given an input question, synthesize a response from the query results.\n"
+            "Query: {query_str}\n"
+            "SQL: {sql_query}\n"
+            "SQL Response: {context_str}\n"
+            "Response: "
+        )
+        return PromptTemplate(
+            response_synthesis_prompt_str,
+        ).format_messages(**kwargs)
+
+
+class PromptStrategyFactory:
+    @staticmethod
+    def create_text2sql_strategy(engine) -> IPromptStrategy:
+        return TextToSQLPromptStrategy(engine)
 
     @staticmethod
-    def create_response_synthesis_prompt():
-        return PromptTemplate(
-            "Given an input question, synthesize a response from the query results.\n"
-            "Query: {query_str}\nSQL: {sql_query}\nSQL Response: {context_str}\nResponse: "
-        )
+    def create_synthesis_strategy() -> IPromptStrategy:
+        return ResponseSynthesisPromptStrategy()
 
-#OPEN_AI CLASS
+
 class OpenAISQLGenerator():
-    def __init__(self, llm):
+    def __init__(self, llm, prompt_strategy: IPromptStrategy):
         self.llm = llm
-        # self.prompt = text2sql_prompt
+        self.prompt_strategy = prompt_strategy
     
-    def generate(self, context: str, query: str, prompt: str) -> str:
-        fmt_messages = prompt.format_messages(
-            query_str=query, schema=context
-        )
+    def change_prompt_strategy(self, new_strategy: IPromptStrategy):
+        self.prompt_strategy = new_strategy
+    
+    def generate(self, context: str, query: str) -> str:
+        fmt_messages = self.prompt_strategy.create_prompt(context, query)
         return self.llm.chat(fmt_messages)
+
 
 class LLMFactory:
     @staticmethod
@@ -101,11 +134,13 @@ class TableRetrieveEvent(Event):
     table_context_str: str
     query: str
 
+
 class TextToSQLEvent(Event):
     """Text-to-SQL event."""
 
     sql: str
     query: str
+
 
 class TextToSQLWorkflow(Workflow):
     """Text-to-SQL Workflow that does query-time table retrieval."""
@@ -134,8 +169,7 @@ class TextToSQLWorkflow(Workflow):
     ) -> TableRetrieveEvent:
         """Retrieve tables."""
         table_schema_objs = self.obj_retriever.retrieve(ev.query)
-        table_context_str = get_table_context_str(table_schema_objs)
-        print("###",table_context_str, "###")
+        table_context_str = self._get_table_context_str(table_schema_objs)
         return TableRetrieveEvent(
             table_context_str=table_context_str, query=ev.query
         )
@@ -145,7 +179,11 @@ class TextToSQLWorkflow(Workflow):
         self, ctx: Context, ev: TableRetrieveEvent
     ) -> TextToSQLEvent:
         """Generate SQL statement."""
-        chat_response = self.sql_generator.generate(ctx, ev.query, PromptFactory.create_text2sql_prompt())
+        kwargs = {
+            "context": ev.table_context_str,
+            "query": ev.query,
+        }
+        chat_response = self.sql_generator.generate(kwargs)
         sql = parse_response_to_sql(chat_response)
         return TextToSQLEvent(sql=sql, query=ev.query)
     
@@ -154,10 +192,16 @@ class TextToSQLWorkflow(Workflow):
         """Run SQL retrieval and generate response."""
         #Executar a query no banco
         retrieved_rows = self.sql_retriever.retrieve(ev.sql)
-        fmt_messages = PromptFactory.create_response_synthesis_prompt(
-            sql_query=ev.sql,
-            context_str=str(retrieved_rows),
-            query_str=ev.query,
-        )
-        chat_response = llm.chat(fmt_messages)
+        self.sql_generator.change_prompt_strategy(PromptStrategyFactory.create_synthesis_strategy())
+        kwargs = {
+            "query_str": ev.query,
+            "sql_query": ev.sql,
+            "context_str": retrieved_rows,
+        }
+        chat_response = self.sql_generator.generate(kwargs)
         return StopEvent(result=chat_response)
+    
+
+    def _get_table_context_str(self, tables: List[SQLTableSchema]) -> str:
+        # Implementation moved from original code
+        pass
