@@ -201,7 +201,7 @@ class TextToSQLWorkflow(Workflow):
         chat_response = self.sql_generator.generate(kwargs)
         return StopEvent(result=chat_response)
     
-
     def _get_table_context_str(self, tables: List[SQLTableSchema]) -> str:
         # Implementation moved from original code
         pass
+    
