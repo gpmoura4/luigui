@@ -148,20 +148,18 @@ class TextToSQLWorkflow(Workflow):
     def __init__(
         self,
         obj_retriever: SQLTableRetriever,
-        text2sql_prompt,
         sql_executor: SQLRunQuery,
-        response_synthesis_prompt,
         sql_generator: OpenAISQLGenerator,
+        sql_database
         *args,
         **kwargs
     ) -> None:
         """Init params."""
         super().__init__(*args, **kwargs)
         self.obj_retriever = obj_retriever
-        self.text2sql_prompt = text2sql_prompt
         self.sql_executor = sql_executor
-        self.response_synthesis_prompt = response_synthesis_prompt
         self.sql_generator = sql_generator
+        self.sql_database = sql_database
     
     @step
     def retrieve_tables(
@@ -200,8 +198,19 @@ class TextToSQLWorkflow(Workflow):
         }
         chat_response = self.sql_generator.generate(kwargs)
         return StopEvent(result=chat_response)
-    
-    def _get_table_context_str(self, tables: List[SQLTableSchema]) -> str:
-        # Implementation moved from original code
-        pass
+
+    def _get_table_context_str(self, table_schema_objs: List[SQLTableSchema]) -> str:
+        """Get table context string."""
+        context_strs = []
+        for table_schema_obj in table_schema_objs:
+            table_info = self.sql_database.get_single_table_info(
+                table_schema_obj.table_name
+            )
+            if table_schema_obj.context_str:
+                table_opt_context = " The table description is: "
+                table_opt_context += table_schema_obj.context_str
+                table_info += table_opt_context
+
+            context_strs.append(table_info)
+        return "\n\n".join(context_strs)
     
