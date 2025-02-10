@@ -214,7 +214,7 @@ class TextToSQLWorkflow(Workflow):
             context_strs.append(table_info)
         return "\n\n".join(context_strs)
     
-    def parse_response_to_sql(self, chat_response: ChatResponse) -> str:
+    def _parse_response_to_sql(self, chat_response: ChatResponse) -> str:
         """Parse response to SQL."""
         response = chat_response.message.content
         sql_query_start = response.find("SQLQuery:")
