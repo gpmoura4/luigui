@@ -182,7 +182,7 @@ class TextToSQLWorkflow(Workflow):
             "query": ev.query,
         }
         chat_response = self.sql_generator.generate(kwargs)
-        sql = parse_response_to_sql(chat_response)
+        sql = self._parse_response_to_sql(chat_response)
         return TextToSQLEvent(sql=sql, query=ev.query)
     
     @step
@@ -214,3 +214,16 @@ class TextToSQLWorkflow(Workflow):
             context_strs.append(table_info)
         return "\n\n".join(context_strs)
     
+    def parse_response_to_sql(self, chat_response: ChatResponse) -> str:
+        """Parse response to SQL."""
+        response = chat_response.message.content
+        sql_query_start = response.find("SQLQuery:")
+        if sql_query_start != -1:
+            response = response[sql_query_start:]
+            # TODO: move to removeprefix after Python 3.9+
+            if response.startswith("SQLQuery:"):
+                response = response[len("SQLQuery:") :]
+        sql_result_start = response.find("SQLResult:")
+        if sql_result_start != -1:
+            response = response[:sql_result_start]
+        return response.strip().strip("```").strip()
