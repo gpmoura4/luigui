@@ -4,10 +4,9 @@ from llama_index.core.workflow import (
     StopEvent,
     step,
     Context,
-    Event,
 )
 
-from llama_index.core import SQLDatabase, VectorStoreIndex
+from llama_index.core import SQLDatabase
 from llama_index.vector_stores.postgres import PGVectorStore
 from llama_index.core.storage import StorageContext
 from llama_index.core.objects import (
@@ -29,6 +28,8 @@ from llama_index.core.llms import ChatMessage
 
 from abc import ABC, abstractmethod
 from typing import Protocol, Any
+
+import schemas
 
 import os
 import openai
@@ -132,7 +133,7 @@ class SQLTableRetriever():
             print(f"Erro ao carregar índice do PGVector: {e}")
             self.obj_index = None  # Evita erro caso não haja índice salvo
 
-    def add_table_schema(self, table_infos):
+    def add_table_schema(self, table_infos: List[schemas.TableInfo]):
         """Adiciona novos schemas de tabelas ao índice"""
         table_node_mapping = SQLTableNodeMapping(self.sql_database)
 
@@ -161,20 +162,6 @@ class SQLRunQuery():
         self.sql_executor = SQLRetriever(sql_database)
 
 
-class TableRetrieveEvent(Event):
-    """Result of running table retrieval."""
-
-    table_context_str: str
-    query: str
-
-
-class TextToSQLEvent(Event):
-    """Text-to-SQL event."""
-
-    sql: str
-    query: str
-
-
 class TextToSQLWorkflow(Workflow):
     """Text-to-SQL Workflow that does query-time table retrieval."""
 
@@ -197,18 +184,18 @@ class TextToSQLWorkflow(Workflow):
     @step
     def retrieve_tables(
         self, ctx: Context, ev: StartEvent
-    ) -> TableRetrieveEvent:
+    ) -> schemas.TableRetrieveEvent:
         """Retrieve tables."""
         table_schema_objs = self.obj_retriever.retrieve(ev.query)
         table_context_str = self._get_table_context_str(table_schema_objs)
-        return TableRetrieveEvent(
+        return schemas.TableRetrieveEvent(
             table_context_str=table_context_str, query=ev.query
         )
     
     @step
     def generate_sql(
-        self, ctx: Context, ev: TableRetrieveEvent
-    ) -> TextToSQLEvent:
+        self, ctx: Context, ev: schemas.TableRetrieveEvent
+    ) -> schemas.TextToSQLEvent:
         """Generate SQL statement."""
         kwargs = {
             "context": ev.table_context_str,
@@ -216,7 +203,7 @@ class TextToSQLWorkflow(Workflow):
         }
         chat_response = self.sql_generator.generate(kwargs)
         sql = self._parse_response_to_sql(chat_response)
-        return TextToSQLEvent(sql=sql, query=ev.query)
+        return schemas.TextToSQLEvent(sql=sql, query=ev.query)
     
     @step
     def generate_response(self, ctx: Context, ev: TextToSQLEvent) -> StopEvent:
