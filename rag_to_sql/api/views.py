@@ -19,7 +19,8 @@ class DatabaseList(APIView):
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status = status.HTTP_201_CREATED)
-        return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)    
+        return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)
+    
 
 class DatabaseDetail(APIView):
     def get_object(self, pk):
@@ -46,16 +47,19 @@ class DatabaseDetail(APIView):
         database.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+
 class TableList(APIView):    
     def post(self, request, db_id, format=None):
         try: 
             database = Database.objects.get(id=db_id)
         except:
-            return Response({"ERROR":"Database not found"}, status = status.HTTP_404_NOT_FOUND)    
+            return Response({"ERROR": "Database not found"}, status = status.HTTP_404_NOT_FOUND)    
         data = request.data 
         data["db_id"] = database.id
         serializer = TableSerializer(data = data)
-        if serializer.is_valid():
+        if serializer.is_valid()
+            # table_retriever = SQLTableRetriever(engine)
+            # table_retriever.add_table(data)
             serializer.save()
             return Response(serializer.data, status = status.HTTP_201_CREATED)
         return Response(serializer.errors, status = status.HTTP_400_BAD_REQUEST)    

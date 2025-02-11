@@ -8,6 +8,8 @@ from llama_index.core.workflow import (
 )
 
 from llama_index.core import SQLDatabase, VectorStoreIndex
+from llama_index.vector_stores.postgres import PGVectorStore
+from llama_index.core.storage import StorageContext
 from llama_index.core.objects import (
     SQLTableNodeMapping,
     ObjectIndex,
@@ -100,26 +102,57 @@ class LLMFactory:
 
 
 class SQLTableRetriever():
-    def __init__(self, engine, table_infos):
-        sql_database = SQLDatabase(engine)
+    def __init__(self, engine):
+        self.sql_database = SQLDatabase(engine)
 
-        # Criando um nó pra cada tabela do Banco
-        table_node_mapping = SQLTableNodeMapping(sql_database)
-        # add a SQLTableSchema for each table com nome e contexto
+        # Configuração do PGVector
+        self.pgvector_store = PGVectorStore.from_params(
+            database="seu_banco",
+            host="localhost",
+            port=5432,
+            user="seu_usuario",
+            password="sua_senha",
+            table_name="vector_store",  # Nome da tabela que armazenará os vetores
+        )
+
+        # Criar StorageContext usando PGVector
+        self.storage_context = StorageContext.from_defaults(vector_store=self.pgvector_store)
+
+        # Recuperar índice existente do PGVector, se houver
+        self.load_existing_index()
+
+    def load_existing_index(self):
+        """Carrega o índice existente do PGVector, se houver"""
+        try:
+            self.obj_index = ObjectIndex.from_vector_store(
+                obj_store=self.pgvector_store, 
+                obj_node_mapping=SQLTableNodeMapping(self.sql_database)
+            )
+        except Exception as e:
+            print(f"Erro ao carregar índice do PGVector: {e}")
+            self.obj_index = None  # Evita erro caso não haja índice salvo
+
+    def add_table_schema(self, table_infos):
+        """Adiciona novos schemas de tabelas ao índice"""
+        table_node_mapping = SQLTableNodeMapping(self.sql_database)
+
         table_schema_objs = [
             SQLTableSchema(table_name=t.table_name, context_str=t.table_summary)
             for t in table_infos
         ]  
-        # Base de dados vetoriais
+
+        # Criar índice usando PGVectorStore e armazená-lo
         self.obj_index = ObjectIndex.from_objects(
             table_schema_objs,
             table_node_mapping,
-            VectorStoreIndex,
+            self.storage_context
         )
-        self.obj_retriever = self.obj_index.as_retriever(similarity_top_k=3)
 
-    # def retrieve(self, top_k: int = 3):
-    #     return self.obj_index.as_retriever(similarity_top_k=top_k)
+    def retrieve(self, question: str) -> List[SQLTableSchema]:
+        """Recupera tabelas relevantes a partir da pergunta"""
+        if not self.obj_index:
+            raise ValueError("O índice não foi carregado. Certifique-se de adicionar schemas ou carregar do banco.")
+        return self.obj_index.as_retriever(similarity_top_k=3).retrieve(question)
 
 
 # Class que executa as querys no banco
@@ -227,3 +260,4 @@ class TextToSQLWorkflow(Workflow):
         if sql_result_start != -1:
             response = response[:sql_result_start]
         return response.strip().strip("```").strip()
+    
