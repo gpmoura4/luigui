@@ -4,7 +4,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from api.models import Database, Table
-from api.serializer import  DatabaseSerializer, TableSerializer
+from api.serializer import DatabaseSerializer, TableSerializer
+import schemas
+from services.rag_service import SQLTableRetriever
 
 
 class DatabaseList(APIView):
@@ -49,17 +51,20 @@ class DatabaseDetail(APIView):
 
 class TableList(APIView):    
     def post(self, request, db_id, format=None):
-        try: 
+        try:
             database = Database.objects.get(id=db_id)
         except:
             return Response({"ERROR": "Database not found"}, status=status.HTTP_404_NOT_FOUND)    
-        data = request.data 
+        data = request.data
         data["db_id"] = database.id
         serializer = TableSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
+            connection_string = schemas.DatabaseConnection.model_validate(serializer)
+            retriever = SQLTableRetriever(connection_string)
+            retriever.add_table_schema(serializer.data["name"])
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)    
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)   
 
     def get(self, request, db_id, format=None):
         # Buscar o id do db atual e listar todas as tabelas desse id

@@ -26,6 +26,8 @@ from llama_index.core.bridge.pydantic import BaseModel, Field
 from llama_index.llms.openai import OpenAI
 from llama_index.core.llms import ChatMessage
 
+from sqlalchemy import create_engine
+
 from abc import ABC, abstractmethod
 from typing import Protocol, Any
 
@@ -103,7 +105,8 @@ class LLMFactory:
 
 
 class SQLTableRetriever():
-    def __init__(self, engine):
+    def __init__(self, cnt_str: schemas.DatabaseConnection):
+        engine = create_engine(f"postgresql://{cnt_str.username}:{cnt_str.password}@{cnt_str.host}:{cnt_str.port}/{cnt_str.database}")
         self.sql_database = SQLDatabase(engine)
 
         # Configuração do PGVector
@@ -133,18 +136,16 @@ class SQLTableRetriever():
             print(f"Erro ao carregar índice do PGVector: {e}")
             self.obj_index = None  # Evita erro caso não haja índice salvo
 
-    def add_table_schema(self, table_infos: List[schemas.TableInfo]):
+    def add_table_schema(self, table_info: schemas.TableInfo):
         """Adiciona novos schemas de tabelas ao índice"""
         table_node_mapping = SQLTableNodeMapping(self.sql_database)
 
-        table_schema_objs = [
-            SQLTableSchema(table_name=t.table_name, context_str=t.table_summary)
-            for t in table_infos
-        ]  
+        table_schema_obj = SQLTableSchema(table_name=table_info.name)
+
 
         # Criar índice usando PGVectorStore e armazená-lo
         self.obj_index = ObjectIndex.from_objects(
-            table_schema_objs,
+            table_schema_obj,
             table_node_mapping,
             self.storage_context
         )
@@ -206,7 +207,7 @@ class TextToSQLWorkflow(Workflow):
         return schemas.TextToSQLEvent(sql=sql, query=ev.query)
     
     @step
-    def generate_response(self, ctx: Context, ev: TextToSQLEvent) -> StopEvent:
+    def generate_response(self, ctx: Context, ev: schemas.TextToSQLEvent) -> StopEvent:
         """Run SQL retrieval and generate response."""
         #Executar a query no banco
         retrieved_rows = self.sql_retriever.retrieve(ev.sql)
