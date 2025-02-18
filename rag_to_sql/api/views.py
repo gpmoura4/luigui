@@ -5,8 +5,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from api.models import Database, Table
 from api.serializer import DatabaseSerializer, TableSerializer
-import schemas
-from services.rag_service import SQLTableRetriever
+from api import schemas
+from api.services.rag_service import SQLTableRetriever
 
 
 class DatabaseList(APIView):
@@ -21,7 +21,7 @@ class DatabaseList(APIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+   
 
 class DatabaseDetail(APIView):
     def get_object(self, pk):
@@ -52,19 +52,26 @@ class DatabaseDetail(APIView):
 class TableList(APIView):    
     def post(self, request, db_id, format=None):
         try:
-            database = Database.objects.get(id=db_id)
+            database_dict = Database.objects.filter(id=db_id).values().first()
+            # database_serializer = DatabaseSerializer(database)
+            # database_serializer.is_valid()
         except:
             return Response({"ERROR": "Database not found"}, status=status.HTTP_404_NOT_FOUND)    
         data = request.data
-        data["db_id"] = database.id
-        serializer = TableSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            connection_string = schemas.DatabaseConnection.model_validate(serializer)
+        data["db_id"] = database_dict["id"]
+        table_serializer = TableSerializer(data=data)
+        print("validou linha -1")
+        if table_serializer.is_valid():
+            print("validou linha 0")
+            table_serializer.save()
+            connection_string = schemas.DatabaseConnection(**database_dict)
+            print("validou linha 1")
             retriever = SQLTableRetriever(connection_string)
-            retriever.add_table_schema(serializer.data["name"])
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)   
+            print("validou linha 2")
+            retriever.add_table_schema(schemas.TableInfo(table_name=table_serializer.data["name"]))
+            print("validou linha 3")
+            return Response(table_serializer.data, status=status.HTTP_201_CREATED)
+        return Response(table_serializer.errors, status=status.HTTP_400_BAD_REQUEST)   
 
     def get(self, request, db_id, format=None):
         # Buscar o id do db atual e listar todas as tabelas desse id

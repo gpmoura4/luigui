@@ -31,7 +31,7 @@ from sqlalchemy import create_engine
 from abc import ABC, abstractmethod
 from typing import Protocol, Any
 
-import schemas
+from api import schemas
 
 import os
 import openai
@@ -39,7 +39,7 @@ import openai
 from dotenv import load_dotenv
 load_dotenv()
 
-openai.api_key = os.getenv["OPENAI_API_KEY"]
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
 class IPromptStrategy(Protocol):
@@ -106,24 +106,28 @@ class LLMFactory:
 
 class SQLTableRetriever():
     def __init__(self, cnt_str: schemas.DatabaseConnection):
-        engine = create_engine(f"postgresql://{cnt_str.username}:{cnt_str.password}@{cnt_str.host}:{cnt_str.port}/{cnt_str.database}")
+        print("SQLTableRetriever validou linha 1")
+        engine = create_engine(f"postgresql://{cnt_str.username}:{cnt_str.password}@{cnt_str.host}:{cnt_str.port}/{cnt_str.name}")
+        print("SQLTableRetriever validou linha 2")
         self.sql_database = SQLDatabase(engine)
-
+        print("SQLTableRetriever validou linha 3")
         # Configuração do PGVector
         self.pgvector_store = PGVectorStore.from_params(
-            database="seu_banco",
-            host="localhost",
-            port=5432,
-            user="seu_usuario",
-            password="sua_senha",
-            table_name="vector_store",  # Nome da tabela que armazenará os vetores
+            database=cnt_str.name,
+            host=cnt_str.host,
+            port=cnt_str.port,
+            user=cnt_str.username,
+            password=cnt_str.password,
+            table_name="vector_"+cnt_str.name,  # Nome da tabela que armazenará os vetores
         )
+        print("SQLTableRetriever validou linha 3")
 
         # Criar StorageContext usando PGVector
         self.storage_context = StorageContext.from_defaults(vector_store=self.pgvector_store)
-
+        print("SQLTableRetriever validou linha 4")
         # Recuperar índice existente do PGVector, se houver
         self.load_existing_index()
+        print("SQLTableRetriever validou linha 4")
 
     def load_existing_index(self):
         """Carrega o índice existente do PGVector, se houver"""
@@ -140,12 +144,12 @@ class SQLTableRetriever():
         """Adiciona novos schemas de tabelas ao índice"""
         table_node_mapping = SQLTableNodeMapping(self.sql_database)
 
-        table_schema_obj = SQLTableSchema(table_name=table_info.name)
-
-
+        table_schema_obj = SQLTableSchema(table_name=table_info.table_name, context_str="cities stats")
+        print("\n\n\n\nTABLE SCHEMA TYPE: ", type(table_schema_obj))
+        print("\n\n\n\nTABLE SCHEMA: ", table_schema_obj)
         # Criar índice usando PGVectorStore e armazená-lo
         self.obj_index = ObjectIndex.from_objects(
-            table_schema_obj,
+            [table_schema_obj],
             table_node_mapping,
             self.storage_context
         )
@@ -171,9 +175,9 @@ class TextToSQLWorkflow(Workflow):
         obj_retriever: SQLTableRetriever,
         sql_executor: SQLRunQuery,
         sql_generator: OpenAISQLGenerator,
-        sql_database
+        sql_database,
         *args,
-        **kwargs
+        **kwargs,
     ) -> None:
         """Init params."""
         super().__init__(*args, **kwargs)
