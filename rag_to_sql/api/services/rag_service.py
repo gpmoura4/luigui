@@ -15,6 +15,9 @@ from llama_index.core.objects import (
     SQLTableSchema,
 )
 
+from llama_index.core import VectorStoreIndex
+
+
 from llama_index.core.retrievers import SQLRetriever
 from typing import List
 from llama_index.core.prompts.default_prompts import DEFAULT_TEXT_TO_SQL_PROMPT
@@ -127,13 +130,13 @@ class SQLTableRetriever():
         print("SQLTableRetriever validou linha 4")
         # Recuperar índice existente do PGVector, se houver
         self.load_existing_index()
-        print("SQLTableRetriever validou linha 4")
+        print("SQLTableRetriever validou linha 5")
 
     def load_existing_index(self):
         """Carrega o índice existente do PGVector, se houver"""
         try:
-            self.obj_index = ObjectIndex.from_vector_store(
-                obj_store=self.pgvector_store, 
+            self.obj_index = VectorStoreIndex.from_vector_store(
+                vector_store=self.pgvector_store, 
                 obj_node_mapping=SQLTableNodeMapping(self.sql_database)
             )
         except Exception as e:
@@ -144,15 +147,18 @@ class SQLTableRetriever():
         """Adiciona novos schemas de tabelas ao índice"""
         table_node_mapping = SQLTableNodeMapping(self.sql_database)
 
-        table_schema_obj = SQLTableSchema(table_name=table_info.table_name, context_str="cities stats")
-        print("\n\n\n\nTABLE SCHEMA TYPE: ", type(table_schema_obj))
-        print("\n\n\n\nTABLE SCHEMA: ", table_schema_obj)
+        table_schema_obj = SQLTableSchema(table_name=table_info.table_name)
+        print("\nTABLE SCHEMA TYPE: ", type(table_schema_obj))
+        print("\nTABLE SCHEMA: ", table_schema_obj)
+        print("\n table_node_mapping: ", table_node_mapping)
+        print("\n self.storage_context: ", self.storage_context)
         # Criar índice usando PGVectorStore e armazená-lo
         self.obj_index = ObjectIndex.from_objects(
             [table_schema_obj],
             table_node_mapping,
             self.storage_context
         )
+        print("teste 1")
 
     def retrieve(self, question: str) -> List[SQLTableSchema]:
         """Recupera tabelas relevantes a partir da pergunta"""
