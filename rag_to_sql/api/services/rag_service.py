@@ -115,6 +115,12 @@ class SQLTableRetriever():
         self.sql_database = SQLDatabase(engine)
         print("SQLTableRetriever validou linha 3")
         # Configuração do PGVector
+
+        # 
+        print("--------- Debugando com chinês:")
+        print("string connection:", f"postgresql://{cnt_str.username}:{cnt_str.password}@{cnt_str.host}:{cnt_str.port}/{cnt_str.name}")
+        print("engine:", engine)
+        
         self.pgvector_store = PGVectorStore.from_params(
             database=cnt_str.name,
             host=cnt_str.host,
@@ -148,10 +154,10 @@ class SQLTableRetriever():
         table_node_mapping = SQLTableNodeMapping(self.sql_database)
 
         table_schema_obj = SQLTableSchema(table_name=table_info.table_name)
-        print("\nTABLE SCHEMA TYPE: ", type(table_schema_obj))
-        print("\nTABLE SCHEMA: ", table_schema_obj)
-        print("\n table_node_mapping: ", table_node_mapping)
-        print("\n self.storage_context: ", self.storage_context)
+        # print("\nTABLE SCHEMA TYPE: ", type(table_schema_obj))
+        # print("\nTABLE SCHEMA: ", table_schema_obj)
+        # print("\n table_node_mapping: ", table_node_mapping)
+        # print("\n self.storage_context: ", self.storage_context)
         # Criar índice usando PGVectorStore e armazená-lo
         self.obj_index = ObjectIndex.from_objects(
             [table_schema_obj],
