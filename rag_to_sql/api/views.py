@@ -55,10 +55,6 @@ class TableList(APIView):
         try:
             db_obj = Database.objects.get(id=db_id)
             database_dict = model_to_dict(db_obj)
-            # database_dict = Database.objects.filter(id=db_id).values().first()
-            # Database.check_password(password=password)
-            # database_serializer = DatabaseSerializer(database)
-            # database_serializer.is_valid()
         except:
             return Response({"ERROR": "Database not found"}, status=status.HTTP_404_NOT_FOUND)    
         data = request.data
@@ -66,21 +62,26 @@ class TableList(APIView):
         try: 
             db_password = data["db_password"]
         except:
-            return Response({"ERROR": "Database password not provided"}, status=status.HTTP_400_BAD_REQUEST)     
-        
+            return Response({"ERROR": "db_password password not provided"}, status=status.HTTP_400_BAD_REQUEST)     
+        table_name = data.get("name")
+        if db_obj.table_set.filter(name=table_name).exists():
+            return Response({"ERROR": "Table with this name already exists"}, status=status.HTTP_400_BAD_REQUEST)
+
         data["db_id"] = database_dict["id"]
         data.pop("db_password", None)
         table_serializer = TableSerializer(data=data)
         if table_serializer.is_valid():
-            # db_password = table_serializer.data["db_password"]
-
-            table_serializer.save()
-            
+            table_serializer.save() 
             if db_obj.check_password(db_password):
                 database_dict["password"] = db_password
                 connection_string = schemas.DatabaseConnection(**database_dict)
-                retriever = SQLTableRetriever(connection_string)
-                retriever.add_table_schema(schemas.TableInfo(table_name=table_serializer.data["name"]))
+                tables = [table.name for table in db_obj.table_set.all()]
+                retriever = SQLTableRetriever(cnt_str=connection_string, tables=tables, have_obj_index=db_obj.obj_index)
+                retriever.add_table_schema()
+                if not db_obj.obj_index:
+                    db_obj.obj_index = True
+                    db_obj.save()
+
             return Response(table_serializer.data, status=status.HTTP_201_CREATED)
         return Response(table_serializer.errors, status=status.HTTP_400_BAD_REQUEST)   
 
