@@ -148,9 +148,9 @@ class SQLTableRetriever():
             ]
             index = VectorStoreIndex.from_vector_store(vector_store=self.pgvector_store)
             table_node_mapping = SQLTableNodeMapping(self.sql_database)
-            return ObjectIndex.from_objects_and_index(objects=table_schema_objs, object_mapping=table_node_mapping, index=index)
+            self.obj_index = ObjectIndex.from_objects_and_index(objects=table_schema_objs, object_mapping=table_node_mapping, index=index)
+            print("\n\nobj_index: ", self.obj_index) 
 
-            print("obj_index: ", self.obj_index)
         except Exception as e:
             print(f"Erro ao carregar índice do PGVector: {e}")
             self.obj_index = None  # Evita erro caso não haja índice salvo
@@ -159,7 +159,7 @@ class SQLTableRetriever():
         if not self.have_obj_index:
             table_node_mapping = SQLTableNodeMapping(self.sql_database)
             tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
-            print("\n\ntables_info schema: ", tables_info)    
+            print("\n\ntables_info schema: ", tables_info) 
             table_schema_objs = [
                 SQLTableSchema(table_name=t.table_name)
                 for t in tables_info
