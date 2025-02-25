@@ -132,7 +132,7 @@ class SQLTableRetriever():
             port=cnt_str.port,
             user=cnt_str.username,
             password=cnt_str.password,
-            table_name="vector10_"+cnt_str.name
+            table_name=""+cnt_str.name
         )
         self.storage_context = StorageContext.from_defaults(vector_store=self.pgvector_store)
 
