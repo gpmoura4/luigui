@@ -77,14 +77,8 @@ class TableList(APIView):
                 tables = [table.name for table in db_obj.table_set.all()]
                 retriever = SQLTableRetriever(cnt_str=connection_string, tables=tables, have_obj_index=db_obj.have_obj_index)
                 retriever.add_table_schema()
-<<<<<<< HEAD
                 if not db_obj.have_obj_index:
                     db_obj.have_obj_index = True
-=======
-                table_serializer.save()
-                if not db_obj.obj_index:
-                    db_obj.obj_index = True
->>>>>>> 10cd885ed21d101826d03bf97076fedf2c520417
                     db_obj.save()
 
             return Response(table_serializer.data, status=status.HTTP_201_CREATED)
