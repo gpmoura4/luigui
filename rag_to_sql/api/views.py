@@ -64,8 +64,8 @@ class TableList(APIView):
         except:
             return Response({"ERROR": "db_password password not provided"}, status=status.HTTP_400_BAD_REQUEST)     
         table_name = data.get("name")
-        if db_obj.table_set.filter(name=table_name).exists():
-            return Response({"ERROR": "Table with this name already exists"}, status=status.HTTP_400_BAD_REQUEST)
+        # if db_obj.table_set.filter(name=table_name).exists():
+        #     return Response({"ERROR": "Table with this name already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
         data["db_id"] = database_dict["id"]
         data.pop("db_password", None)
@@ -74,19 +74,19 @@ class TableList(APIView):
             table_serializer.save() 
             if db_obj.check_password(db_password):
                 database_dict["password"] = db_password
-                connection_string = schemas.DatabaseConnection(**database_dict)
+                connection_string = schemas.DatabaseConnection(**database_dict)    
                 tables = [table.name for table in db_obj.table_set.all()]
-                retriever = SQLTableRetriever(cnt_str=connection_string, tables=tables, have_obj_index=db_obj.obj_index)
+                retriever = SQLTableRetriever(cnt_str=connection_string, tables=tables, have_obj_index=db_obj.have_obj_index)
                 retriever.add_table_schema()
-                if not db_obj.obj_index:
-                    db_obj.obj_index = True
+                if not db_obj.have_obj_index:
+                    db_obj.have_obj_index = True
                     db_obj.save()
 
             return Response(table_serializer.data, status=status.HTTP_201_CREATED)
         return Response(table_serializer.errors, status=status.HTTP_400_BAD_REQUEST)   
 
     def get(self, request, db_id, format=None):
-        # Buscar o id do db atual e listar todas as tabelas desse id
+        # Buscar o id do db atual e listar todas as tabelas desse id    
         tables = Table.objects.filter(db_id=db_id)
         serializer = TableSerializer(tables, many=True)
         return Response(serializer.data)

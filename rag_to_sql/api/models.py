@@ -9,8 +9,7 @@ class Database(models.Model):
     password = models.CharField(max_length=255, verbose_name='Database Hashed Password')
     port = models.PositiveIntegerField(verbose_name='Database Port')
     host = models.CharField(max_length=255, verbose_name='Database Host')
-    obj_index = models.BooleanField(default=False, verbose_name='Have Object Index')
-    obj_node_mapping_path = models.CharField(max_length=255, verbose_name='Object Node Mapping Path')
+    have_obj_index = models.BooleanField(default=False, verbose_name='Have Object Index')
 
     def __str__(self):
         return str(self.id)

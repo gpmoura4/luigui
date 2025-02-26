@@ -146,33 +146,35 @@ class SQLTableRetriever():
                 SQLTableSchema(table_name=t.table_name)
                 for t in tables_info
             ]
-            index = VectorStoreIndex.from_vector_store(vector_store=self.pgvector_store)
             table_node_mapping = SQLTableNodeMapping(self.sql_database)
+            index = VectorStoreIndex.from_vector_store(vector_store=self.pgvector_store)
             return ObjectIndex.from_objects_and_index(objects=table_schema_objs, object_mapping=table_node_mapping, index=index)
-
-            print("obj_index: ", self.obj_index)
         except Exception as e:
             print(f"Erro ao carregar índice do PGVector: {e}")
             self.obj_index = None  # Evita erro caso não haja índice salvo
 
     def add_table_schema(self):
-        if not self.have_obj_index:
-            table_node_mapping = SQLTableNodeMapping(self.sql_database)
-            tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
-            print("\n\ntables_info schema: ", tables_info)    
-            table_schema_objs = [
-                SQLTableSchema(table_name=t.table_name)
-                for t in tables_info
-            ]
-            print("\n\ntable_schema_objs: ", table_schema_objs)
-            self.obj_index = ObjectIndex.from_objects(
-                objects=table_schema_objs,
-                object_mapping=table_node_mapping,
-                index_cls=VectorStoreIndex,
-                storage_context=self.storage_context
-            )
-        if self.have_obj_index:    
-            self.obj_index = self.load_existing_index()
+        # if not self.have_obj_index:
+        table_node_mapping = SQLTableNodeMapping(self.sql_database)
+        tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
+        print("\n\ntables_info schema: ", tables_info)    
+        table_schema_objs = [
+            SQLTableSchema(table_name=t.table_name)
+            for t in tables_info
+        ]
+        print("\n\ntable_schema_objs: ", table_schema_objs)
+        self.obj_index = ObjectIndex.from_objects(
+            objects=table_schema_objs,
+            object_mapping=table_node_mapping,
+            index_cls=VectorStoreIndex,
+            storage_context=self.storage_context
+        )
+        # if self.have_obj_index:    
+        #     self.obj_index = self.load_existing_index()
+        #     print("self.obj_index: ", self.obj_index)
+            # Se for diferente de None
+            
+            
         
 
     #     """Adiciona novos schemas de tabelas ao índice"""
