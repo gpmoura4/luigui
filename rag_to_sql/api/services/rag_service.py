@@ -188,7 +188,8 @@ class SQLTableRetriever():
     def add_table_schema(self, new_table_name):
         if not self.have_obj_index:
             table_node_mapping = SQLTableNodeMapping(self.sql_database)
-            tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
+            tables_info = [schemas.TableInfo(table_name=new_table_name)]
+            # tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
             print("\n\ntables_info schema: ", tables_info)    
             table_schema_objs = [
                 SQLTableSchema(table_name=t.table_name)
