@@ -120,11 +120,10 @@ class SQLTableRetriever():
         self.tables = tables
         self.have_obj_index = have_obj_index
         self.obj_index = None
-        print("SQLTableRetriever validou linha 1")
+        
         engine = create_engine(f"postgresql://{self.cnt_str.username}:{self.cnt_str.password}@{self.cnt_str.host}:{self.cnt_str.port}/{self.cnt_str.name}")
-        print("engine: ", engine)
         self.sql_database = SQLDatabase(engine)
-        print("SQLTableRetriever validou linha 1")
+    
         
         self.pgvector_store = PGVectorStore.from_params(
             database=cnt_str.name,
@@ -136,6 +135,39 @@ class SQLTableRetriever():
         )
         self.storage_context = StorageContext.from_defaults(vector_store=self.pgvector_store)
 
+    def adding_existing_index(self, new_table_name):
+        """ADICIONANDO NOVA TABELA AO PGVECTOR NUM INDEX JÁ EXISTENTE"""
+        try:
+            tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
+            print("\n\ntables_info schema load: ", tables_info)    
+            table_schema_objs = [
+                SQLTableSchema(table_name=t.table_name)
+                for t in tables_info
+            ]
+            table_node_mapping = SQLTableNodeMapping(self.sql_database)
+            index = VectorStoreIndex.from_vector_store(vector_store=self.pgvector_store)
+            obj_test = ObjectIndex.from_objects_and_index(objects=table_schema_objs, object_mapping=table_node_mapping, index=index)
+            
+            query_engine = SQLTableRetrieverQueryEngine(
+                self.sql_database, obj_test.as_retriever(similarity_top_k=1)
+            )
+
+            response = query_engine.query("Which city has the highest population?") 
+
+            print("\response: ", response)
+            print("\nobj_test: ", obj_test)
+
+            # Cria uma nova instância de SQLTableSchema para a nova tabela
+            print("\ntable_name:", new_table_name)
+            # Cria a instância para a nova tabela
+            new_table_schema = SQLTableSchema(table_name=new_table_name)
+            # Converte o novo objeto para um nó usando o mapeamento
+            new_node = table_node_mapping.to_node(new_table_schema)
+            # Insere o novo nó diretamente no índice
+            index.insert_nodes([new_node])
+        except Exception as e:
+            print(f"Erro ao carregar índice do PGVector: {e}")
+            self.obj_index = None  # Evita erro caso não haja índice salvo
 
     def load_existing_index(self):
         """Carrega o índice existente do PGVector, se houver"""
@@ -153,56 +185,27 @@ class SQLTableRetriever():
             print(f"Erro ao carregar índice do PGVector: {e}")
             self.obj_index = None  # Evita erro caso não haja índice salvo
 
-    def add_table_schema(self):
-        # if not self.have_obj_index:
-        table_node_mapping = SQLTableNodeMapping(self.sql_database)
-        tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
-        print("\n\ntables_info schema: ", tables_info)    
-        table_schema_objs = [
-            SQLTableSchema(table_name=t.table_name)
-            for t in tables_info
-        ]
-        print("\n\ntable_schema_objs: ", table_schema_objs)
-        self.obj_index = ObjectIndex.from_objects(
-            objects=table_schema_objs,
-            object_mapping=table_node_mapping,
-            index_cls=VectorStoreIndex,
-            storage_context=self.storage_context
-        )
-        # if self.have_obj_index:    
-        #     self.obj_index = self.load_existing_index()
-        #     print("self.obj_index: ", self.obj_index)
+    def add_table_schema(self, new_table_name):
+        if not self.have_obj_index:
+            table_node_mapping = SQLTableNodeMapping(self.sql_database)
+            tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
+            print("\n\ntables_info schema: ", tables_info)    
+            table_schema_objs = [
+                SQLTableSchema(table_name=t.table_name)
+                for t in tables_info
+            ]
+            print("\n\ntable_schema_objs: ", table_schema_objs)
+            self.obj_index = ObjectIndex.from_objects(
+                objects=table_schema_objs,
+                object_mapping=table_node_mapping,
+                index_cls=VectorStoreIndex,
+                storage_context=self.storage_context
+            )
+        if self.have_obj_index:    
+            self.obj_index = self.adding_existing_index(new_table_name)
+            print("self.obj_index: ", self.obj_index)
             # Se for diferente de None
             
-            
-        
-
-    #     """Adiciona novos schemas de tabelas ao índice"""
-    #     table_node_mapping = SQLTableNodeMapping(self.sql_database)
-
-    #     table_schema_obj = SQLTableSchema(table_name=table_info.table_name)
-    #     # print("\nTABLE SCHEMA TYPE: ", type(table_schema_obj))
-    #     # print("\nTABLE SCHEMA: ", table_schema_obj)
-    #     # print("\n table_node_mapping: ", table_node_mapping)
-    #     # print("\n self.storage_context: ", self.storage_context)
-    #     # Criar índice usando PGVectorStore e armazená-lo
-    #     self.obj_index = ObjectIndex.from_objects(
-    #         [table_schema_obj],
-    #         table_node_mapping,
-    #         self.storage_context
-    #     )
-    #     print("teste 1")
-
-    # def retrieve(self, question: str) -> List[SQLTableSchema]:
-    #     """Recupera tabelas relevantes a partir da pergunta"""
-    #     if not self.obj_index:
-    #         raise ValueError("O índice não foi carregado. Certifique-se de adicionar schemas ou carregar do banco.")
-        # query_engine = SQLTableRetrieverQueryEngine(
-        #     self.sql_database, self.obj_index.as_retriever(similarity_top_k=1)
-        # )
-        # response = query_engine.query("Which city has the highest population?")
-    #     return self.obj_index.as_retriever(similarity_top_k=3).retrieve(question)
-
 
 # Class que executa as querys no banco
 class SQLRunQuery():
