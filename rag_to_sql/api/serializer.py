@@ -6,6 +6,7 @@ class DatabaseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Database
         fields = [
+                "id",
                 "name", 
                 "username", 
                 "password", 
@@ -30,8 +31,9 @@ class TableSerializer(serializers.ModelSerializer):
     class Meta:
         model = Table
         fields = [
+                "id",
                 "name", 
-                "db_id"
+                "db_id",
                 ]
 class QuestionSerializer(serializers.ModelSerializer):
     class Meta:

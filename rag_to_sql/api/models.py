@@ -9,6 +9,7 @@ class Database(models.Model):
     password = models.CharField(max_length=255, verbose_name='Database Hashed Password')
     port = models.PositiveIntegerField(verbose_name='Database Port')
     host = models.CharField(max_length=255, verbose_name='Database Host')
+    have_obj_index = models.BooleanField(default=False, verbose_name='Have Object Index')
 
     def __str__(self):
         return str(self.id)
@@ -19,17 +20,17 @@ class Database(models.Model):
     def check_password(self, raw_password):
         return check_password(raw_password, self.password)
 
+
 class Table(models.Model):
     db_id = models.ForeignKey(Database, on_delete=models.CASCADE)
     name = models.CharField(max_length=255, verbose_name='Table Name')
 
     def __str__(self):
         return self.name
+    
+
 class QuestionAnswer(models.Model):
-    user_id = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     question = models.TextField( verbose_name='User Natural Language Question')
     answer = models.TextField( verbose_name='RAG Answer')
     query = models.TextField( verbose_name='SQL Query')
-    
-
-    
