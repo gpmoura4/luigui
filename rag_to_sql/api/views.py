@@ -64,8 +64,8 @@ class TableList(APIView):
         except:
             return Response({"ERROR": "db_password password not provided"}, status=status.HTTP_400_BAD_REQUEST)     
         table_name = data.get("name")
-        # if db_obj.table_set.filter(name=table_name).exists():
-        #     return Response({"ERROR": "Table with this name already exists"}, status=status.HTTP_400_BAD_REQUEST)
+        if db_obj.table_set.filter(name=table_name).exists():
+            return Response({"ERROR": "Table with this name already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
         data["db_id"] = database_dict["id"]
         data.pop("db_password", None)
@@ -90,6 +90,7 @@ class TableList(APIView):
         tables = Table.objects.filter(db_id=db_id)
         serializer = TableSerializer(tables, many=True)
         return Response(serializer.data)
+    
 
 
 
@@ -110,8 +111,22 @@ class TableDetail(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
  
     def delete(self, request, db_id, pk, format=None):
+        try:
+            db_obj = Database.objects.get(id=db_id)
+            database_dict = model_to_dict(db_obj)
+        except:
+            return Response({"ERROR": "Database not found"}, status=status.HTTP_404_NOT_FOUND)    
+        
+        connection_string = schemas.DatabaseConnection(**database_dict)    
+        tables = [table.name for table in db_obj.table_set.all()]
+        retriever = SQLTableRetriever(cnt_str=connection_string, tables=tables, have_obj_index=db_obj.have_obj_index)
         table = self.get_object(pk)
+        print("-------- DELETE FUNCTION -------")
+        print("table: ", table)
+        print("table.name: ", table.name)
+        retriever.delete_table_schema(table.name)
         table.delete()
+
         return Response(status=status.HTTP_204_NO_CONTENT)
     
     def get_object(self, pk):
