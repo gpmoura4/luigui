@@ -33,21 +33,24 @@ class TableSerializer(serializers.ModelSerializer):
         fields = [
                 "id",
                 "name", 
-                "db_id",
+                "database",
                 ]
 class QuestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuestionAnswer
         fields = [
-                "user_id",
+                # "user_id",
+                "database",
                 "question"
                 ]
-class AnswerSerializer(serializers.ModelSerializer):
+class CompleteQASerializer(serializers.ModelSerializer):
     class Meta:
         model = QuestionAnswer
         fields = [
-                "user_id",
+                # "user_id",
+                "database",
                 "question",
                 "answer",
                 "query"
                 ]
+        

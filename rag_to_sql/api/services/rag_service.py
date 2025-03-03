@@ -149,20 +149,10 @@ class SQLTableRetriever():
 
             obj_test = ObjectIndex.from_objects_and_index(objects=table_schema_objs, object_mapping=table_node_mapping, index=index)
             
-            # query_engine = SQLTableRetrieverQueryEngine(
-            #     self.sql_database, obj_test.as_retriever(similarity_top_k=1)
-            # )
-
-            # response = query_engine.query("Qual o funcionário com o maior salário?") 
-            # print("\rResponse: ", response)
-            # print("\nObj_test: ", obj_test)
-
-            # Cria uma nova instância de SQLTableSchema para a nova tabela
-            # Cria a instância para a nova tabela
             new_table_schema = SQLTableSchema(table_name=new_table_name)
-            # Converte o novo objeto para um nó usando o mapeamento
+            
             new_node = table_node_mapping.to_node(new_table_schema)
-            # Insere o novo nó diretamente no índice
+        
             index.insert_nodes([new_node])
         except Exception as e:
             print(f"Erro ao carregar índice do PGVector: {e}")
@@ -255,51 +245,11 @@ class SQLTableRetriever():
         
         print(f"Tabela '{table_to_delete}' removida e index atualizado.")
         
+    def retrieve(self, query: str) -> List[SQLTableSchema]:    
+        self.obj_index = self.load_existing_index()
+        return self.obj_index.as_retriever(similarity_top_k=3).retrieve(query)
 
 
-    # def delete_table_schema(self, table_to_delete):
-    #     print("-------- delete_table_schema -------")
-    #     # tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
-        
-    #     # table_schema_objs = [
-    #     #     SQLTableSchema(table_name=t.table_name)
-    #     #     for t in tables_info
-    #     # ]
-    #     table_node_mapping = SQLTableNodeMapping(self.sql_database)
-
-    #     # self.pgvector_store = PGVectorStore.from_params(
-    #     #     database=cnt_str.name,
-    #     #     host=cnt_str.host,
-    #     #     port=cnt_str.port,
-    #     #     user=cnt_str.username,
-    #     #     password=cnt_str.password,
-    #     #     table_name=""+cnt_str.name
-    #     # )
-    #     # self.storage_context = StorageContext.from_defaults(vector_store=self.pgvector_store)
-
-        
-        
-
-    #     # index = VectorStoreIndex.from_vector_store(vector_store=self.pgvector_store)
-
-    #     # obj_test = ObjectIndex.from_objects_and_index(
-    #     #     objects=table_schema_objs,
-    #     #     object_mapping=table_node_mapping,
-    #     #     index=index
-    #     # )
-                        
-    #     # Cria a instância para a tabela que deseja deletar
-    #     new_table_schema = SQLTableSchema(table_name=table_to_delete)
-    #     # Converte o objeto para um nó usando o mapeamento
-    #     node = table_node_mapping.to_node(new_table_schema)
-    #     print("delete node function deletará o nó:", node)
-    #     # Extraia o identificador do nó (supondo que seja o atributo 'id_')
-    #     node_id = node.id_
-    #     # Deleta o nó diretamente no índice usando o identificador\
-
-    #     # index.delete([node_id])
-    #     self.pgvector_store.clear()
-    #     print("delete node function delete sucess!")
     
 
 
@@ -395,3 +345,48 @@ class TextToSQLWorkflow(Workflow):
             response = response[:sql_result_start]
         return response.strip().strip("```").strip()
     
+
+async def starts_workflow(cnt_str: schemas.DatabaseConnection, tables: List[str], user_question: str, have_obj_index: bool):
+    print("-------- Starting starts_workflow --------")
+    engine = create_engine(f"postgresql://{cnt_str.username}:{cnt_str.password}@{cnt_str.host}:{cnt_str.port}/{cnt_str.name}")
+    sql_database = SQLDatabase(engine)
+
+    obj_retriever = SQLTableRetriever(
+        cnt_str=cnt_str,
+        tables=tables,
+        have_obj_index=have_obj_index
+    )
+
+    print("obj_retriever", obj_retriever)
+
+    sql_executor = SQLRunQuery(
+        sql_database=sql_database
+    )
+
+    print("sql_executor", sql_executor)
+
+    llm=LLMFactory.create_llm("gpt-4o")
+    sqlprompt=TextToSQLPromptStrategy()
+
+    sql_generator = OpenAISQLGenerator(
+        llm=llm,
+        sqlprompt=sqlprompt
+    )
+
+    print("sql_generator", sql_generator)
+
+    txt_tosql_workflow = TextToSQLWorkflow(
+        obj_retriever=obj_retriever,
+        sql_executor=sql_executor,
+        sql_generator=sql_generator,
+        sql_database=sql_database
+    )
+
+    print("txt_tosql_workflow", txt_tosql_workflow)
+
+    response = await txt_tosql_workflow.run(query=user_question)
+
+    print("Response: " + response)
+
+    return response
+
