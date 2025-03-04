@@ -35,22 +35,12 @@ class TableSerializer(serializers.ModelSerializer):
                 "name", 
                 "database",
                 ]
-class QuestionSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = QuestionAnswer
-        fields = [
-                # "user_id",
-                "database",
-                "question"
-                ]
-class CompleteQASerializer(serializers.ModelSerializer):
-    class Meta:
-        model = QuestionAnswer
-        fields = [
-                # "user_id",
-                "database",
-                "question",
-                "answer",
-                "query"
-                ]
         
+class QuestionAnswerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuestionAnswer
+        fields = ["database", "question", "answer", "query"]
+        extra_kwargs = {
+            "answer": {"read_only": True},
+            "query": {"read_only": True},
+        }
