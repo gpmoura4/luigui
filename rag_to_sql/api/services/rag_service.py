@@ -54,7 +54,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 class IPromptStrategy(Protocol):
     @abstractmethod
-    def create_prompt(self, **kwargs: Any) -> str:
+    def create_prompt(self, kwargs: Any) -> str:
         """Interface para estratégias de prompt"""
         pass
 
@@ -65,14 +65,14 @@ class TextToSQLPromptStrategy(IPromptStrategy):
             dialect=engine.dialect.name
         )
     
-    def create_prompt(self, **kwargs: Any) -> str:
+    def create_prompt(self, kwargs: Any) -> str:
         return self.base_prompt.format_messages(
             query_str=kwargs["query"], schema=kwargs["context"]
         )
 
 
 class ResponseSynthesisPromptStrategy(IPromptStrategy):
-    def create_prompt(self, **kwargs: Any) -> str:
+    def create_prompt(self, kwargs: Any) -> str:
         response_synthesis_prompt_str = (
             "Given an input question, synthesize a response from the query results.\n"
             "Query: {query_str}\n"
@@ -82,7 +82,7 @@ class ResponseSynthesisPromptStrategy(IPromptStrategy):
         )
         return PromptTemplate(
             response_synthesis_prompt_str,
-        ).format_messages(**kwargs)
+        ).format_messages(kwargs)
 
 
 class PromptStrategyFactory:
@@ -103,8 +103,8 @@ class OpenAISQLGenerator():
     def change_prompt_strategy(self, new_strategy: IPromptStrategy):
         self.prompt_strategy = new_strategy
     
-    def generate(self, context: str, query: str) -> str:
-        fmt_messages = self.prompt_strategy.create_prompt(context, query)
+    def generate(self, kwargs) -> str:
+        fmt_messages = self.prompt_strategy.create_prompt(kwargs)
         return self.llm.chat(fmt_messages)
 
 
@@ -306,7 +306,7 @@ class TextToSQLWorkflow(Workflow):
     def generate_response(self, ctx: Context, ev: schemas.TextToSQLEvent) -> StopEvent:
         """Run SQL retrieval and generate response."""
         #Executar a query no banco
-        retrieved_rows = self.sql_retriever.retrieve(ev.sql)
+        retrieved_rows = self.obj_retriever.retrieve(ev.sql)
         self.sql_generator.change_prompt_strategy(PromptStrategyFactory.create_synthesis_strategy())
         kwargs = {
             "query_str": ev.query,
@@ -366,11 +366,11 @@ async def starts_workflow(cnt_str: schemas.DatabaseConnection, tables: List[str]
     print("sql_executor", sql_executor)
 
     llm=LLMFactory.create_llm("gpt-4o")
-    sqlprompt=TextToSQLPromptStrategy()
+    prompt_strategy=TextToSQLPromptStrategy(engine)
 
     sql_generator = OpenAISQLGenerator(
         llm=llm,
-        sqlprompt=sqlprompt
+        prompt_strategy=prompt_strategy
     )
 
     print("sql_generator", sql_generator)
@@ -386,7 +386,7 @@ async def starts_workflow(cnt_str: schemas.DatabaseConnection, tables: List[str]
 
     response = await txt_tosql_workflow.run(query=user_question)
 
-    print("Response: " + response)
+    print("Response: ", response)
 
     return response
 

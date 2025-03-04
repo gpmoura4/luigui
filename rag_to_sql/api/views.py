@@ -8,6 +8,7 @@ from api.serializer import DatabaseSerializer, TableSerializer, QuestionSerializ
 from api import schemas
 from api.services.rag_service import *
 from django.forms.models import model_to_dict
+import asyncio
 
 
 class DatabaseList(APIView):
@@ -143,32 +144,42 @@ class TableDetail(APIView):
 
 class QuestionAnswerList(APIView):    
     def post(self, request, database, format=None):
+        print("starting post question answer list")
         try: 
+            print("question answer try")
             db_obj = Database.objects.get(id=database)
             database_dict = model_to_dict(db_obj)
         except:
             return Response({"ERROR":"Database not found"}, status=status.HTTP_404_NOT_FOUND)    
         data = request.data 
         try: 
+            print("question answer try db_password")
             db_password = data["db_password"]    
         except:
             return Response({"ERROR": "db_password password not provided"}, status=status.HTTP_400_BAD_REQUEST)     
 
         
         data["database"] = db_obj.id
+        # data["user_id"] = 5
         data.pop("db_password", None)
         serializer = QuestionSerializer(data=data)
-        
+        print("--------- view question linha 0")                
         if serializer.is_valid():            
+            print("--------- view question linha 1")                
             if db_obj.check_password(db_password):
                 database_dict["password"] = db_password
                 connection_string = schemas.DatabaseConnection(**database_dict)    
                 tables = [table.name for table in db_obj.table_set.all()]
-                response = starts_workflow(
-                    connection_string, 
-                    tables, 
-                    db_obj.have_obj_index
-                )
+
+                print("--------- view question linha 2")                
+                
+                response = asyncio.run(starts_workflow(
+                    cnt_str=connection_string, 
+                    tables=tables, 
+                    user_question=data["question"],
+                    have_obj_index=db_obj.have_obj_index
+                ))
+                print("--------- view question linha 3")                
                 serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)    

@@ -30,7 +30,7 @@ class Table(models.Model):
     
 
 class QuestionAnswer(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    # user = models.ForeignKey(User, on_delete=models.CASCADE)
     database = models.ForeignKey(Database, on_delete=models.CASCADE)
     question = models.TextField( verbose_name='User Natural Language Question')
     answer = models.TextField( verbose_name='RAG Answer', null=True, blank=True)
