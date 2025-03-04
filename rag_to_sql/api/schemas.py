@@ -21,7 +21,6 @@ class TextToSQLEvent(Event):
     query: str
 
 class WorkFlowResult(Event):
-    """Text-to-SQL event."""
     sql_query: str
     response: str
 

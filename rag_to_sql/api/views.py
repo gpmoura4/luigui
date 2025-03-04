@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from api.models import Database, Table, QuestionAnswer
-from api.serializer import DatabaseSerializer, TableSerializer, QuestionSerializer, CompleteQASerializer
+from api.serializer import DatabaseSerializer, TableSerializer, QuestionAnswerSerializer
 from api import schemas
 from api.services.rag_service import *
 from django.forms.models import model_to_dict
@@ -162,7 +162,7 @@ class QuestionAnswerList(APIView):
         data["database"] = db_obj.id
         # data["user_id"] = 5
         data.pop("db_password", None)
-        serializer = QuestionSerializer(data=data)
+        serializer = QuestionAnswerSerializer(data=data)
         print("--------- view question linha 0")                
         if serializer.is_valid():            
             print("--------- view question linha 1")                
@@ -180,7 +180,9 @@ class QuestionAnswerList(APIView):
                     have_obj_index=db_obj.have_obj_index
                 ))
                 print("VIEW response", response)
-                print("--------- view question linha 3")                
+                print("--------- view question linha 3")
+                serializer.validated_data["answer"] = response.response
+                serializer.validated_data["query"] = response.query
                 serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)    
@@ -188,7 +190,7 @@ class QuestionAnswerList(APIView):
     def get(self, request, database, format=None):
         # Buscar o id do db atual e listar todas as tabelas desse id
         questions = QuestionAnswer.objects.filter(database=database)
-        serializer = CompleteQASerializer(questions, many=True)
+        serializer = QuestionAnswerSerializer(questions, many=True)
         return Response(serializer.data)
 
 

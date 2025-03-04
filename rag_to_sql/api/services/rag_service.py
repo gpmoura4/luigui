@@ -335,8 +335,8 @@ class TextToSQLWorkflow(Workflow):
         print("\n chat_response: ",chat_response)
         print(" ---------------- generate_response return:", StopEvent(result=chat_response))
         
-        response = schemas.WorkFlowResult(sql_query=ev.sql,response=chat_response)
-        return StopEvent(result=response)
+        result = schemas.WorkFlowResult(sql_query=ev.sql,response=chat_response)
+        return StopEvent(result=result)
 
     def _get_table_context_str(self, table_schema_objs: List[SQLTableSchema]) -> str:
         """Get table context string."""
@@ -377,7 +377,12 @@ class TextToSQLWorkflow(Workflow):
 
     
 
-async def starts_workflow(cnt_str: schemas.DatabaseConnection, tables: List[str], user_question: str, have_obj_index: bool):
+async def starts_workflow(
+        cnt_str: schemas.DatabaseConnection, 
+        tables: List[str], 
+        user_question: str, 
+        have_obj_index: bool
+        ) -> schemas.WorkFlowResult:
     engine = create_engine(f"postgresql://{cnt_str.username}:{cnt_str.password}@{cnt_str.host}:{cnt_str.port}/{cnt_str.name}")
     sql_database = SQLDatabase(engine)
 
