@@ -179,6 +179,7 @@ class QuestionAnswerList(APIView):
                     user_question=data["question"],
                     have_obj_index=db_obj.have_obj_index
                 ))
+                print("VIEW response", response)
                 print("--------- view question linha 3")                
                 serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
