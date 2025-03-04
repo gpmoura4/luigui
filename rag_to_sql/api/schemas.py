@@ -20,6 +20,10 @@ class TextToSQLEvent(Event):
     sql: str
     query: str
 
+class WorkFlowResult(Event):
+    """Text-to-SQL event."""
+    sql_query: str
+    response: str
 
 class DatabaseConnection(BaseModel):
     """Database connection information."""

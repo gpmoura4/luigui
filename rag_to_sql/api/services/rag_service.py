@@ -54,7 +54,7 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 class IPromptStrategy(Protocol):
     @abstractmethod
-    def create_prompt(self, **kwargs: Any) -> str:
+    def create_prompt(self, kwargs: Any) -> str:
         """Interface para estratégias de prompt"""
         pass
 
@@ -65,14 +65,14 @@ class TextToSQLPromptStrategy(IPromptStrategy):
             dialect=engine.dialect.name
         )
     
-    def create_prompt(self, **kwargs: Any) -> str:
+    def create_prompt(self, kwargs: Any) -> str:
         return self.base_prompt.format_messages(
             query_str=kwargs["query"], schema=kwargs["context"]
         )
 
 
 class ResponseSynthesisPromptStrategy(IPromptStrategy):
-    def create_prompt(self, **kwargs: Any) -> str:
+    def create_prompt(self, kwargs: Any) -> str:
         response_synthesis_prompt_str = (
             "Given an input question, synthesize a response from the query results.\n"
             "Query: {query_str}\n"
@@ -82,7 +82,11 @@ class ResponseSynthesisPromptStrategy(IPromptStrategy):
         )
         return PromptTemplate(
             response_synthesis_prompt_str,
-        ).format_messages(**kwargs)
+        ).format_messages(
+            query_str=kwargs["query_str"], 
+            sql_query=kwargs["sql_query"],
+            context_str=kwargs["context_str"]
+        )
 
 
 class PromptStrategyFactory:
@@ -103,15 +107,18 @@ class OpenAISQLGenerator():
     def change_prompt_strategy(self, new_strategy: IPromptStrategy):
         self.prompt_strategy = new_strategy
     
-    def generate(self, context: str, query: str) -> str:
-        fmt_messages = self.prompt_strategy.create_prompt(context, query)
+    def generate(self, kwargs) -> str:
+        fmt_messages = self.prompt_strategy.create_prompt(kwargs)
+        print("--------- generate step")
+        print("\n--------- fmt_messages: ", fmt_messages)
+        print("\n--------- kwargs: ", kwargs)
         return self.llm.chat(fmt_messages)
 
 
 class LLMFactory:
     @staticmethod
     def create_llm(model: str):
-        return OpenAI(model=model)
+        return OpenAI(model=model, timeout=20)
 
 
 class SQLTableRetriever():
@@ -149,20 +156,10 @@ class SQLTableRetriever():
 
             obj_test = ObjectIndex.from_objects_and_index(objects=table_schema_objs, object_mapping=table_node_mapping, index=index)
             
-            # query_engine = SQLTableRetrieverQueryEngine(
-            #     self.sql_database, obj_test.as_retriever(similarity_top_k=1)
-            # )
-
-            # response = query_engine.query("Qual o funcionário com o maior salário?") 
-            # print("\rResponse: ", response)
-            # print("\nObj_test: ", obj_test)
-
-            # Cria uma nova instância de SQLTableSchema para a nova tabela
-            # Cria a instância para a nova tabela
             new_table_schema = SQLTableSchema(table_name=new_table_name)
-            # Converte o novo objeto para um nó usando o mapeamento
+            
             new_node = table_node_mapping.to_node(new_table_schema)
-            # Insere o novo nó diretamente no índice
+        
             index.insert_nodes([new_node])
         except Exception as e:
             print(f"Erro ao carregar índice do PGVector: {e}")
@@ -255,51 +252,11 @@ class SQLTableRetriever():
         
         print(f"Tabela '{table_to_delete}' removida e index atualizado.")
         
+    def retrieve(self, query: str) -> List[SQLTableSchema]:    
+        self.obj_index = self.load_existing_index()
+        return self.obj_index.as_retriever(similarity_top_k=3, timeout=15).retrieve(query)
 
 
-    # def delete_table_schema(self, table_to_delete):
-    #     print("-------- delete_table_schema -------")
-    #     # tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
-        
-    #     # table_schema_objs = [
-    #     #     SQLTableSchema(table_name=t.table_name)
-    #     #     for t in tables_info
-    #     # ]
-    #     table_node_mapping = SQLTableNodeMapping(self.sql_database)
-
-    #     # self.pgvector_store = PGVectorStore.from_params(
-    #     #     database=cnt_str.name,
-    #     #     host=cnt_str.host,
-    #     #     port=cnt_str.port,
-    #     #     user=cnt_str.username,
-    #     #     password=cnt_str.password,
-    #     #     table_name=""+cnt_str.name
-    #     # )
-    #     # self.storage_context = StorageContext.from_defaults(vector_store=self.pgvector_store)
-
-        
-        
-
-    #     # index = VectorStoreIndex.from_vector_store(vector_store=self.pgvector_store)
-
-    #     # obj_test = ObjectIndex.from_objects_and_index(
-    #     #     objects=table_schema_objs,
-    #     #     object_mapping=table_node_mapping,
-    #     #     index=index
-    #     # )
-                        
-    #     # Cria a instância para a tabela que deseja deletar
-    #     new_table_schema = SQLTableSchema(table_name=table_to_delete)
-    #     # Converte o objeto para um nó usando o mapeamento
-    #     node = table_node_mapping.to_node(new_table_schema)
-    #     print("delete node function deletará o nó:", node)
-    #     # Extraia o identificador do nó (supondo que seja o atributo 'id_')
-    #     node_id = node.id_
-    #     # Deleta o nó diretamente no índice usando o identificador\
-
-    #     # index.delete([node_id])
-    #     self.pgvector_store.clear()
-    #     print("delete node function delete sucess!")
     
 
 
@@ -315,16 +272,16 @@ class TextToSQLWorkflow(Workflow):
     def __init__(
         self,
         obj_retriever: SQLTableRetriever,
-        sql_executor: SQLRunQuery,
+        sql_run_query: SQLRunQuery,
         sql_generator: OpenAISQLGenerator,
         sql_database,
         *args,
         **kwargs,
     ) -> None:
         """Init params."""
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs, timeout=30)
         self.obj_retriever = obj_retriever
-        self.sql_executor = sql_executor
+        self.sql_run_query = sql_run_query
         self.sql_generator = sql_generator
         self.sql_database = sql_database
     
@@ -333,8 +290,13 @@ class TextToSQLWorkflow(Workflow):
         self, ctx: Context, ev: StartEvent
     ) -> schemas.TableRetrieveEvent:
         """Retrieve tables."""
+        # print("--------- retrieve_tables step test")
         table_schema_objs = self.obj_retriever.retrieve(ev.query)
         table_context_str = self._get_table_context_str(table_schema_objs)
+
+        print(" ---------------- retrieve_tables return:", schemas.TableRetrieveEvent(
+            table_context_str=table_context_str, query=ev.query))
+
         return schemas.TableRetrieveEvent(
             table_context_str=table_context_str, query=ev.query
         )
@@ -344,30 +306,41 @@ class TextToSQLWorkflow(Workflow):
         self, ctx: Context, ev: schemas.TableRetrieveEvent
     ) -> schemas.TextToSQLEvent:
         """Generate SQL statement."""
+        # print("--------- generate_sql step test")
         kwargs = {
             "context": ev.table_context_str,
             "query": ev.query,
         }
         chat_response = self.sql_generator.generate(kwargs)
         sql = self._parse_response_to_sql(chat_response)
+        print(" ---------------- generate_sql return:", schemas.TextToSQLEvent(sql=sql, query=ev.query))
         return schemas.TextToSQLEvent(sql=sql, query=ev.query)
     
     @step
     def generate_response(self, ctx: Context, ev: schemas.TextToSQLEvent) -> StopEvent:
+        # print("--------- generate_response step test")
         """Run SQL retrieval and generate response."""
+        
         #Executar a query no banco
-        retrieved_rows = self.sql_retriever.retrieve(ev.sql)
+        query_response = self.sql_run_query.sql_executor.retrieve(ev.sql)
+        print("\nretrieved_schemas: ",query_response)
         self.sql_generator.change_prompt_strategy(PromptStrategyFactory.create_synthesis_strategy())
+        print("\nself.sql_generator: ",self.sql_generator)
         kwargs = {
-            "query_str": ev.query,
+            "query_str": ev.query, 
             "sql_query": ev.sql,
-            "context_str": retrieved_rows,
+            "context_str": query_response,
         }
         chat_response = self.sql_generator.generate(kwargs)
-        return StopEvent(result=chat_response)
+        print("\n chat_response: ",chat_response)
+        print(" ---------------- generate_response return:", StopEvent(result=chat_response))
+        
+        response = schemas.WorkFlowResult(sql_query=ev.sql,response=chat_response)
+        return StopEvent(result=response)
 
     def _get_table_context_str(self, table_schema_objs: List[SQLTableSchema]) -> str:
         """Get table context string."""
+        # print("--------- _get_table_context_str step test")
         context_strs = []
         for table_schema_obj in table_schema_objs:
             table_info = self.sql_database.get_single_table_info(
@@ -379,19 +352,75 @@ class TextToSQLWorkflow(Workflow):
                 table_info += table_opt_context
 
             context_strs.append(table_info)
+            print(" ---------------- _get_table_context_str return:", "\n\n".join(context_strs))
         return "\n\n".join(context_strs)
     
     def _parse_response_to_sql(self, chat_response: ChatResponse) -> str:
         """Parse response to SQL."""
         response = chat_response.message.content
         sql_query_start = response.find("SQLQuery:")
+    
         if sql_query_start != -1:
-            response = response[sql_query_start:]
-            # TODO: move to removeprefix after Python 3.9+
-            if response.startswith("SQLQuery:"):
-                response = response[len("SQLQuery:") :]
+            response = response[sql_query_start:].removeprefix("SQLQuery:")
+    
         sql_result_start = response.find("SQLResult:")
         if sql_result_start != -1:
             response = response[:sql_result_start]
-        return response.strip().strip("```").strip()
+
+        # Garantir remoção completa dos caracteres ```
+        response = response.strip()
+        if response.startswith("```") and response.endswith("```"):
+            response = response[3:-3].strip()
+
+        print(" ---------------- _parse_response_to_sql return:", response)
+        return response
+
     
+
+async def starts_workflow(cnt_str: schemas.DatabaseConnection, tables: List[str], user_question: str, have_obj_index: bool):
+    engine = create_engine(f"postgresql://{cnt_str.username}:{cnt_str.password}@{cnt_str.host}:{cnt_str.port}/{cnt_str.name}")
+    sql_database = SQLDatabase(engine)
+
+    obj_retriever = SQLTableRetriever(
+        cnt_str=cnt_str,
+        tables=tables,
+        have_obj_index=have_obj_index
+    )
+
+    print("obj_retriever", obj_retriever)
+
+    sql_run_query = SQLRunQuery(
+        sql_database=sql_database
+    )
+
+    print("sql_run_query", sql_run_query)
+
+    llm=LLMFactory.create_llm("gpt-4o")
+    prompt_strategy=TextToSQLPromptStrategy(engine)
+
+    sql_generator = OpenAISQLGenerator(
+        llm=llm,
+        prompt_strategy=prompt_strategy
+    )
+
+    print("sql_generator", sql_generator)
+
+    txt_tosql_workflow = TextToSQLWorkflow(
+        obj_retriever=obj_retriever,
+        sql_run_query=sql_run_query,
+        sql_generator=sql_generator,
+        sql_database=sql_database
+    )
+
+    print("txt_tosql_workflow", txt_tosql_workflow)
+
+    response = await txt_tosql_workflow.run(
+        query=user_question,
+        timeout=30
+        )
+
+    print("\n\nResponse: ", response.sql_query)
+    print("\n\n")
+
+    return response
+

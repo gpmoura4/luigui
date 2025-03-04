@@ -22,7 +22,7 @@ class Database(models.Model):
 
 
 class Table(models.Model):
-    db_id = models.ForeignKey(Database, on_delete=models.CASCADE)
+    database = models.ForeignKey(Database, on_delete=models.CASCADE)
     name = models.CharField(max_length=255, verbose_name='Table Name')
 
     def __str__(self):
@@ -30,7 +30,8 @@ class Table(models.Model):
     
 
 class QuestionAnswer(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    # user = models.ForeignKey(User, on_delete=models.CASCADE)
+    database = models.ForeignKey(Database, on_delete=models.CASCADE)
     question = models.TextField( verbose_name='User Natural Language Question')
-    answer = models.TextField( verbose_name='RAG Answer')
-    query = models.TextField( verbose_name='SQL Query')
+    answer = models.TextField( verbose_name='RAG Answer', null=True, blank=True)
+    query = models.TextField( verbose_name='SQL Query', null=True, blank=True)
