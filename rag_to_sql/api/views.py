@@ -182,7 +182,7 @@ class QuestionAnswerList(APIView):
                 print("VIEW response", response)
                 print("--------- view question linha 3")
                 serializer.validated_data["answer"] = response.response
-                serializer.validated_data["query"] = response.query
+                serializer.validated_data["query"] = response.sql_query
                 serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)    

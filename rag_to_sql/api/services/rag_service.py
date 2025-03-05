@@ -332,10 +332,14 @@ class TextToSQLWorkflow(Workflow):
             "context_str": query_response,
         }
         chat_response = self.sql_generator.generate(kwargs)
+        response_text = chat_response.message.content
         print("\n chat_response: ",chat_response)
-        print(" ---------------- generate_response return:", StopEvent(result=chat_response))
-        
-        result = schemas.WorkFlowResult(sql_query=ev.sql,response=chat_response)
+        print("\n chat_response TIPO: ", type(chat_response))
+        print("\n chat_response dir: ", dir(chat_response))
+        print(" ---------------- generate_response return:", StopEvent(result=response_text))
+    
+
+        result = schemas.WorkFlowResult(sql_query=ev.sql,response=response_text)
         return StopEvent(result=result)
 
     def _get_table_context_str(self, table_schema_objs: List[SQLTableSchema]) -> str:
