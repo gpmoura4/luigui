@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 
 
 class Database(models.Model):
+    user = models.ForeignKey('auth.User', related_name='databases', on_delete=models.CASCADE)
     name = models.CharField(max_length=255, verbose_name='Database Name')
     username = models.CharField(max_length=255, verbose_name='Database Username')
     password = models.CharField(max_length=255, verbose_name='Database Hashed Password')
@@ -30,7 +31,6 @@ class Table(models.Model):
     
 
 class QuestionAnswer(models.Model):
-    # user = models.ForeignKey(User, on_delete=models.CASCADE)
     database = models.ForeignKey(Database, on_delete=models.CASCADE)
     question = models.TextField( verbose_name='User Natural Language Question')
     answer = models.TextField( verbose_name='RAG Answer', null=True, blank=True)
