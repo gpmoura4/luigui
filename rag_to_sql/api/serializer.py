@@ -1,5 +1,19 @@
 from rest_framework import serializers
 from api.models import Database, Table,QuestionAnswer
+from django.contrib.auth.models import User
+
+
+class UserSerializer(serializers.ModelSerializer):
+    databases = serializers.PrimaryKeyRelatedField(many=True, queryset=Database.objects.all())
+
+    class Meta:
+        model = User
+        fields = [
+                "id",
+                "username", 
+                "databases"
+                ]
+
 
 class DatabaseSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
