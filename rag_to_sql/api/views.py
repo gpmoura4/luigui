@@ -4,11 +4,23 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from api.models import Database, Table, QuestionAnswer
-from api.serializer import DatabaseSerializer, TableSerializer, QuestionAnswerSerializer
+from api.serializer import DatabaseSerializer, TableSerializer, QuestionAnswerSerializer, UserSerializer
 from api import schemas
 from api.services.rag_service import *
 from django.forms.models import model_to_dict
 import asyncio
+from django.contrib.auth.models import User
+from rest_framework import generics
+
+
+class UserList(generics.ListAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+
+
+class UserDetail(generics.RetrieveAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
 
 
 class DatabaseList(APIView):
