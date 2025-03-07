@@ -11,6 +11,7 @@ from django.forms.models import model_to_dict
 import asyncio
 from django.contrib.auth.models import User
 from rest_framework import generics
+from rest_framework import permissions
 
 
 class UserList(generics.ListAPIView):
@@ -23,21 +24,38 @@ class UserDetail(generics.RetrieveAPIView):
     serializer_class = UserSerializer
 
 
+# arquivo views.py
 class DatabaseList(APIView):
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    
     def get(self, request, format=None):
-        databases = Database.objects.all()
+        # Alteração: Filtra os databases pelo usuário autenticado
+        if request.user.is_authenticated:
+            databases = Database.objects.filter(user=request.user)
+        else:
+            databases = Database.objects.none()  # Retorna um queryset vazio se não estiver autenticado
+
         serializer = DatabaseSerializer(databases, many=True)
         return Response(serializer.data)
 
     def post(self, request, format=None):
-        serializer = DatabaseSerializer(data=request.data)
+        # Remove todas as manipulações manuais do user_id
+        serializer = DatabaseSerializer(
+            data=request.data,
+            context={'request': request}  # Importante para o CurrentUserDefault
+        )
+        
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
    
 
 class DatabaseDetail(APIView):
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     def get_object(self, pk):
         try:
             return Database.objects.get(pk=pk)

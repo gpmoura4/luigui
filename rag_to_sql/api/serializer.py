@@ -15,32 +15,38 @@ class UserSerializer(serializers.ModelSerializer):
                 ]
 
 
+# arquivo serializer.py
 class DatabaseSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
+    user = serializers.HiddenField(  # Alteração aqui: campo oculto com valor padrão
+        default=serializers.CurrentUserDefault()
+    )
+
     class Meta:
         model = Database
         fields = [
-                "id",
-                "name", 
-                "username", 
-                "password", 
-                "port", 
-                "host" 
-                ]
+            "user",  # Mantido nos campos
+            "id",
+            "name", 
+            "username", 
+            "password", 
+            "port", 
+            "host"
+        ]
+
     def create(self, validated_data):
+        # Extrai a senha antes de criar o objeto
         raw_password = validated_data.pop('password')
-    
-        # Cria a instância SEM salvar no banco
-        database = Database(**validated_data)
-    
+        
+        # Cria a instância JÁ INCLUINDO o user do validated_data
+        database = Database.objects.create(**validated_data)
+        
         # Define a senha hasheada
         database.set_password(raw_password)
-        
-        # Salva apenas uma vez aqui
         database.save()
         
         return database
-    
+        
 class TableSerializer(serializers.ModelSerializer):
     class Meta:
         model = Table
