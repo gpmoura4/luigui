@@ -12,6 +12,9 @@ import asyncio
 from django.contrib.auth.models import User
 from rest_framework import generics
 from rest_framework import permissions
+from api.permissions import IsOwner
+
+
 
 
 class UserList(generics.ListAPIView):
@@ -26,7 +29,7 @@ class UserDetail(generics.RetrieveAPIView):
 
 # arquivo views.py
 class DatabaseList(APIView):
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly,IsOwner]
     
     def get(self, request, format=None):
         # Alteração: Filtra os databases pelo usuário autenticado
@@ -55,17 +58,21 @@ class DatabaseList(APIView):
    
 
 class DatabaseDetail(APIView):
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [permissions.IsAuthenticated, IsOwner]  # Requer autenticação
+
     def get_object(self, pk):
         try:
-            return Database.objects.get(pk=pk)
+            # Filtra o database pelo ID E pelo usuário autenticado
+            return Database.objects.get(pk=pk, user=self.request.user)
         except Database.DoesNotExist:
-            raise Http404
+            raise Http404  # Retorna 404 se não existir ou não pertencer ao usuário
 
     def get(self, request, pk, format=None):
-        database = self.get_object(pk)
+        database = self.get_object(pk)  # Só chega aqui se o objeto existir e pertencer ao usuário
         serializer = DatabaseSerializer(database)
         return Response(serializer.data)
+
+    # Mantenha os métodos PUT e DELETE conforme já existem
 
     def put(self, request, pk, format=None):
         database = self.get_object(pk)
@@ -82,21 +89,22 @@ class DatabaseDetail(APIView):
 
 
 class TableList(APIView):    
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwner]
     def post(self, request, database, format=None):
         try:
             db_obj = Database.objects.get(id=database)
             database_dict = model_to_dict(db_obj)
         except:
-            return Response({"ERROR": "Database not found"}, status=status.HTTP_404_NOT_FOUND)    
+            return Response({"ERROR": "Database not found."}, status=status.HTTP_404_NOT_FOUND)    
         data = request.data
 
         try: 
             db_password = data["db_password"]
         except:
-            return Response({"ERROR": "db_password password not provided"}, status=status.HTTP_400_BAD_REQUEST)     
+            return Response({"ERROR": "db_password password not provided."}, status=status.HTTP_400_BAD_REQUEST)     
         table_name = data.get("name")
         if db_obj.table_set.filter(name=table_name).exists():
-            return Response({"ERROR": "Table with this name already exists"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"ERROR": "Table with this name already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
         data["database"] = database_dict["id"]
         data.pop("db_password", None)
@@ -116,16 +124,29 @@ class TableList(APIView):
             return Response(table_serializer.data, status=status.HTTP_201_CREATED)
         return Response(table_serializer.errors, status=status.HTTP_400_BAD_REQUEST)   
 
+    
     def get(self, request, database, format=None):
-        # Buscar o id do db atual e listar todas as tabelas desse id    
+        if request.user.is_authenticated:        
+            print("IF USER TABLE request.user.is_authenticated:")
+            try:
+                user_database = Database.objects.get(pk=database, user=self.request.user)        
+            except:
+                return Response({"ERROR": "Not found."}, status=status.HTTP_400_BAD_REQUEST)     
+        else:
+            print("ELSE USER TABLE")
+            return Response({"ERROR": "User is not is_authenticated."}, status=status.HTTP_400_BAD_REQUEST)     
+            databases = Database.objects.none()  # Retorna um queryset vazio se não estiver autenticado
+
         tables = Table.objects.filter(database=database)
         serializer = TableSerializer(tables, many=True)
         return Response(serializer.data)
+        # Buscar o id do db atual e listar todas as tabelas desse id    
     
 
 
 
 class TableDetail(APIView):
+    
     def put(self, request, database, pk,  format=None):
         try: 
             db_obj = Database.objects.get(id=database)
@@ -174,6 +195,7 @@ class TableDetail(APIView):
 
 class QuestionAnswerList(APIView):    
     def post(self, request, database, format=None):
+        print("obj:", obj)
         print("starting post question answer list")
         try: 
             print("question answer try")
