@@ -12,7 +12,7 @@ import asyncio
 from django.contrib.auth.models import User
 from rest_framework import generics
 from rest_framework import permissions
-from api.permissions import IsOwner
+from api.permissions import IsOwner, IsOwnerTable
 
 
 
@@ -89,7 +89,7 @@ class DatabaseDetail(APIView):
 
 
 class TableList(APIView):    
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwner]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerTable]
     def post(self, request, database, format=None):
         try:
             db_obj = Database.objects.get(id=database)
@@ -132,7 +132,7 @@ class TableList(APIView):
                 user_database = Database.objects.get(pk=database, user=self.request.user)        
             except:
                 return Response({"ERROR": "Not found."}, status=status.HTTP_400_BAD_REQUEST)     
-        else:
+        else:   
             print("ELSE USER TABLE")
             return Response({"ERROR": "User is not is_authenticated."}, status=status.HTTP_400_BAD_REQUEST)     
             databases = Database.objects.none()  # Retorna um queryset vazio se não estiver autenticado
@@ -146,7 +146,7 @@ class TableList(APIView):
 
 
 class TableDetail(APIView):
-    
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerTable]
     def put(self, request, database, pk,  format=None):
         try: 
             db_obj = Database.objects.get(id=database)
@@ -181,9 +181,10 @@ class TableDetail(APIView):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
     
-    def get_object(self, pk):
+    def get_object(self, database_id, pk):
         try:
-            return Table.objects.get(pk=pk)
+            # Garante que a tabela pertence ao database especificado
+            return Table.objects.get(pk=pk, database__id=database_id)
         except Table.DoesNotExist:
             raise Http404
         
@@ -195,7 +196,6 @@ class TableDetail(APIView):
 
 class QuestionAnswerList(APIView):    
     def post(self, request, database, format=None):
-        print("obj:", obj)
         print("starting post question answer list")
         try: 
             print("question answer try")

@@ -13,10 +13,9 @@ class IsOwner(permissions.BasePermission):
 
 class IsOwnerTable(permissions.BasePermission):
     """
-    Permite acesso APENAS se o usuário for dono do objeto, mesmo para leitura.
+    Permite acesso APENAS se o usuário for dono do database associado à tabela
     """
-
+    
     def has_object_permission(self, request, view, obj):
-        # Bloqueia TODOS os métodos (GET, PUT, DELETE) se o usuário não for dono
-        
-        return obj.user == request.user  # Campo correto é 'user', não 'owner'
+        # Verifica se o database da tabela pertence ao usuário
+        return obj.database.user == request.user  # Acesso via relação tabela -> database -> user
