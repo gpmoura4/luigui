@@ -141,57 +141,116 @@ class TableList(APIView):
         serializer = TableSerializer(tables, many=True)
         return Response(serializer.data)
         # Buscar o id do db atual e listar todas as tabelas desse id    
-    
-
-
 
 class TableDetail(APIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerTable]
-    def put(self, request, database, pk,  format=None):
-        try: 
+    
+    def get_object(self, database, pk):
+        """
+        Recupera a tabela garantindo que ela pertença ao database especificado e checa as permissões.
+        """
+        try:
+            table = Table.objects.get(pk=pk, database__id=database)
+            # Verifica as permissões para o objeto recuperado
+            self.check_object_permissions(self.request, table)
+            return table
+        except Table.DoesNotExist:
+            raise Http404
+
+    def get(self, request, database, pk, format=None):
+        table = self.get_object(database, pk)
+        serializer = TableSerializer(table)
+        return Response(serializer.data)  
+    def put(self, request, database, pk, format=None):
+        # Primeiro, verifica se o database existe
+        try:
             db_obj = Database.objects.get(id=database)
-        except:
-            return Response({"ERROR":"Database not found"}, status=status.HTTP_404_NOT_FOUND)    
-        data = request.data 
+        except Database.DoesNotExist:
+            return Response({"ERROR": "Database not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Recupera a tabela com a verificação de permissão
+        table = self.get_object(database, pk)
+        
+        # Atualiza os dados e garante que o campo "database" seja o ID correto
+        data = request.data.copy()  # Faz uma cópia mutável dos dados
         data["database"] = db_obj.id
         
-        table = self.get_object(pk)
         serializer = TableSerializer(table, data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
- 
+
     def delete(self, request, database, pk, format=None):
+        # Primeiro, verifica se o database existe
         try:
             db_obj = Database.objects.get(id=database)
-            database_dict = model_to_dict(db_obj)
-        except:
-            return Response({"ERROR": "Database not found"}, status=status.HTTP_404_NOT_FOUND)    
+        except Database.DoesNotExist:
+            return Response({"ERROR": "Database not found"}, status=status.HTTP_404_NOT_FOUND)
         
-        connection_string = schemas.DatabaseConnection(**database_dict)    
-        tables = [table.name for table in db_obj.table_set.all()]
+        # Recupera a tabela com a verificação de permissão
+        table = self.get_object(database, pk)
+        
+        # Prepara a conexão para manipulação do schema da tabela
+        database_dict = model_to_dict(db_obj)
+        connection_string = schemas.DatabaseConnection(**database_dict)
+        tables = [table_obj.name for table_obj in db_obj.table_set.all()]
         retriever = SQLTableRetriever(cnt_str=connection_string, tables=tables, have_obj_index=db_obj.have_obj_index)
-        table = self.get_object(pk)
-        print("-------- DELETE FUNCTION -------")
-        print("table: ", table)
-        print("table.name: ", table.name)
+        
+        # Remove a definição do schema e deleta a tabela
         retriever.delete_table_schema(table.name)
         table.delete()
-
-        return Response(status=status.HTTP_204_NO_CONTENT)
-    
-    def get_object(self, database_id, pk):
-        try:
-            # Garante que a tabela pertence ao database especificado
-            return Table.objects.get(pk=pk, database__id=database_id)
-        except Table.DoesNotExist:
-            raise Http404
         
-    def get(self, request, database, pk, format=None):
-        table = self.get_object(pk)
-        serializer = TableSerializer(table)
-        return Response(serializer.data)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# class TableDetail(APIView):
+#     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerTable]
+#     def put(self, request, database, pk,  format=None):
+#         try: 
+#             db_obj = Database.objects.get(id=database)
+#         except:
+#             return Response({"ERROR":"Database not found"}, status=status.HTTP_404_NOT_FOUND)    
+#         data = request.data 
+#         data["database"] = db_obj.id
+        
+#         table = self.get_object(pk)
+#         serializer = TableSerializer(table, data=data)
+#         if serializer.is_valid():
+#             serializer.save()
+#             return Response(serializer.data)
+#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+ 
+#     def delete(self, request, database, pk, format=None):
+#         try:
+#             db_obj = Database.objects.get(id=database)
+#             database_dict = model_to_dict(db_obj)
+#         except:
+#             return Response({"ERROR": "Database not found"}, status=status.HTTP_404_NOT_FOUND)    
+        
+#         connection_string = schemas.DatabaseConnection(**database_dict)    
+#         tables = [table.name for table in db_obj.table_set.all()]
+#         retriever = SQLTableRetriever(cnt_str=connection_string, tables=tables, have_obj_index=db_obj.have_obj_index)
+#         table = self.get_object(pk)
+#         print("-------- DELETE FUNCTION -------")
+#         print("table: ", table)
+#         print("table.name: ", table.name)
+#         retriever.delete_table_schema(table.name)
+#         table.delete()
+
+#         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+#     def get_object(self, database_id, pk):
+#         try:
+#             # Garante que a tabela pertence ao database especificado
+#             return Table.objects.get(pk=pk, database__id=database_id)
+#         except Table.DoesNotExist:
+#             raise Http404
+        
+#     def get(self, request, database, pk, format=None):
+#         table = self.get_object(pk)
+#         serializer = TableSerializer(table)
+#         return Response(serializer.data)
 
 
 class QuestionAnswerList(APIView):    
