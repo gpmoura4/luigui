@@ -17,7 +17,7 @@ class Database(models.Model):
     password = models.CharField(max_length=255, verbose_name='Database Hashed Password', blank=True, null=True)
     port = models.PositiveIntegerField(verbose_name='Database Port', blank=True, null=True)
     host = models.CharField(max_length=255, verbose_name='Database Host', blank=True, null=True)
-    has_object_index = models.BooleanField(default=False, verbose_name='Has Object Index')
+    have_obj_index = models.BooleanField(default=False, verbose_name='Have Object Index')
 
     def __str__(self):
         return str(self.id)
@@ -27,8 +27,8 @@ class Database(models.Model):
 
     def check_password(self, raw_password):
         return check_password(raw_password, self.password)
-
-    def clean(self):
+        
+    def clean(self):    
         # Call the base class's clean() method to maintain default validation
         super().clean()
 

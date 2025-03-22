@@ -4,13 +4,29 @@ Copyright (c) 2019 - present AppSeed.us
 """
 
 import os
+import environ
 from decouple import config
 from unipath import Path
 from pathlib import Path
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
-BASE_DIR = Path(__file__).parent
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).parent    
 CORE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+env = environ.Env(
+    DB_NAME=(str, "vector"),
+    DB_USER=(str, "user"),
+    DB_PASSWORD=(str, "pass"),
+    DB_HOST=(str, "localhost"),
+    DB_PORT=(str, "5438"),
+)
+env_file = os.path.join(BASE_DIR, ".env")
+env.read_env(env_file)
+
+
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = config('SECRET_KEY', default='S#perS3crEt_1122')

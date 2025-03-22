@@ -92,6 +92,7 @@ class DatabaseDetail(APIView):
 class TableList(APIView):    
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerTable]
     def post(self, request, database, format=None):
+        # Validação da tabela
         try:
             db_obj = Database.objects.get(id=database)
             database_dict = model_to_dict(db_obj)
@@ -107,6 +108,7 @@ class TableList(APIView):
             if db_obj.table_set.filter(name=table_name).exists():
                 return Response({"ERROR": "Table with this name already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
+            # Inserindo a tabela 
             data["database"] = database_dict["id"]
             data.pop("db_password", None)
             table_serializer = TableSerializer(data=data)
@@ -120,15 +122,22 @@ class TableList(APIView):
                     table_serializer.save() 
                     if not db_obj.have_obj_index:
                         db_obj.have_obj_index = True
-                        db_obj.save()
-        if db_obj.type == "minimal":
-            try: 
-                db_password = data["schemas"]
-            except:
-                return Response({"ERROR": "schemas not provided."}, status=status.HTTP_400_BAD_REQUEST)     
-            table_name = data.get("name")
-            return Response(table_serializer.data, status=status.HTTP_201_CREATED)
-        return Response(table_serializer.errors, status=status.HTTP_400_BAD_REQUEST)   
+                        db_obj.save()       
+                    # table_name = data.get("name")
+                return Response(table_serializer.data, status=status.HTTP_201_CREATED)
+            return Response(table_serializer.errors, status=status.HTTP_400_BAD_REQUEST)   
+        # if db_obj.type == "minimal":
+        #     # Apenas o campo schemas é obrigatório, mas os outros podem ficar null
+        #     try: 
+        #         only_schemas = data["schemas"]
+        #     except:
+        #         return Response({"ERROR": "schemas not provided."}, status=status.HTTP_400_BAD_REQUEST)     
+        #     # Chamar a função para formatar o only_schemas para uma lista de schemas
+        #     only_schemas_formatted = generate_postgres_schemas(only_schemas)
+            # subir o only_schemas_formatted
+            
+    
+        
 
     
     def get(self, request, database, format=None):

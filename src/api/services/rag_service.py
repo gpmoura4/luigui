@@ -42,6 +42,7 @@ from api.models import Database
 
 import os
 import openai
+from core import settings
 
 from dotenv import load_dotenv
 
@@ -133,12 +134,148 @@ class SQLTableRetriever():
     
         
         self.pgvector_store = PGVectorStore.from_params(
-            database=cnt_str.name,
-            host=cnt_str.host,
-            port=cnt_str.port,
-            user=cnt_str.username,
-            password=cnt_str.password,
-            table_name=""+cnt_str.name
+            database=settings.env('DB_NAME'),
+            host=settings.env('DB_HOST'),
+            port=settings.env('DB_PORT'),
+            user=settings.env('DB_USER'),
+            password=settings.env('DB_PASSWORD'),
+            table_name=cnt_str.name
+        )
+        self.storage_context = StorageContext.from_defaults(vector_store=self.pgvector_store)
+
+    def adding_existing_index(self, new_table_name):
+        """ADICIONANDO NOVA TABELA AO PGVECTOR NUM INDEX JÁ EXISTENTE"""
+        try:
+            tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
+            # print("\n\ntables_info schema load: ", tables_info)    
+            table_schema_objs = [
+                SQLTableSchema(table_name=t.table_name)
+                for t in tables_info
+            ]
+            table_node_mapping = SQLTableNodeMapping(self.sql_database)
+            index = VectorStoreIndex.from_vector_store(vector_store=self.pgvector_store)
+
+            obj_test = ObjectIndex.from_objects_and_index(objects=table_schema_objs, object_mapping=table_node_mapping, index=index)
+            
+            new_table_schema = SQLTableSchema(table_name=new_table_name)
+            
+            new_node = table_node_mapping.to_node(new_table_schema)
+        
+            index.insert_nodes([new_node])
+        except Exception as e:
+            print(f"Erro ao carregar índice do PGVector: {e}")
+            self.obj_index = None  # Evita erro caso não haja índice salvo
+
+    def load_existing_index(self):
+        """Carrega o índice existente do PGVector, se houver"""
+        try:
+            tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
+            # print("\n\ntables_info schema load: ", tables_info)    
+            table_schema_objs = [
+                SQLTableSchema(table_name=t.table_name)
+                for t in tables_info
+            ]
+            table_node_mapping = SQLTableNodeMapping(self.sql_database)
+            index = VectorStoreIndex.from_vector_store(vector_store=self.pgvector_store)
+            return ObjectIndex.from_objects_and_index(objects=table_schema_objs, object_mapping=table_node_mapping, index=index)
+        except Exception as e:
+            print(f"Erro ao carregar índice do PGVector: {e}")
+            self.obj_index = None  # Evita erro caso não haja índice salvo
+
+    def add_table_schema(self, new_table_name):
+        if not self.have_obj_index:
+            table_node_mapping = SQLTableNodeMapping(self.sql_database)
+            tables_info = [schemas.TableInfo(table_name=new_table_name)]
+            # tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
+            # print("\n\ntables_info schema: ", tables_info)    
+            table_schema_objs = [
+                SQLTableSchema(table_name=t.table_name)
+                for t in tables_info
+            ]
+            # print("\n\ntable_schema_objs: ", table_schema_objs)
+            self.obj_index = ObjectIndex.from_objects(
+                objects=table_schema_objs,
+                object_mapping=table_node_mapping,
+                index_cls=VectorStoreIndex,
+                storage_context=self.storage_context
+            )
+        if self.have_obj_index:    
+            self.obj_index = self.adding_existing_index(new_table_name)
+            # print("self.obj_index: ", self.obj_index)
+            # Se for diferente de None
+
+    def delete_table_schema(self, table_to_delete):
+        # Clear no data_vector
+        self.pgvector_store.clear()
+
+        print("-------- delete_table_schema -------")
+
+        print("------------ Self.Tables --------------")
+        print(self.tables)
+
+        # Atualize a lista de tabelas removendo a que deve ser deletada
+        print("NAME table_to_delete: ", table_to_delete)
+        
+        for table in self.tables:
+            print("table names in self.tables: ", table)
+            if table != table_to_delete:
+                print("if atendido!")
+                
+    
+        # Criando uma lista com as tabelas com nomes diferentes da que a gente está deletando
+        self.tables = [table for table in self.tables if table != table_to_delete]
+        
+        # Recrie o índice com as tabelas restantes
+        table_node_mapping = SQLTableNodeMapping(self.sql_database)
+        tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
+        table_schema_objs = [
+            SQLTableSchema(table_name=t.table_name)
+            for t in tables_info
+        ]
+        print("\n")
+        
+        for t in tables_info:
+            print("Nome da tabela:", t)
+
+        print("\n")
+        print("self.storage_context:", self.storage_context)
+        print("\n") 
+        print("table_schema_objs:", table_schema_objs)
+        print("\n") 
+        
+        
+        self.obj_index = ObjectIndex.from_objects(
+            objects=table_schema_objs,
+            object_mapping=table_node_mapping,
+            index_cls=VectorStoreIndex,
+            storage_context=self.storage_context
+        )
+        
+        print(f"Tabela '{table_to_delete}' removida e index atualizado.")
+        
+    def retrieve(self, query: str) -> List[SQLTableSchema]:    
+        self.obj_index = self.load_existing_index()
+        return self.obj_index.as_retriever(similarity_top_k=3, timeout=15).retrieve(query)
+    
+class SQLSchemaRetriever():
+    def __init__(self, cnt_str: schemas.DatabaseConnection, tables: List[str], have_obj_index: bool):
+        self.cnt_str = cnt_str
+        self.tables = tables
+        self.have_obj_index = have_obj_index
+        self.obj_index = None
+        
+        engine = create_engine(f"postgresql://{self.cnt_str.username}:{self.cnt_str.password}@{self.cnt_str.host}:{self.cnt_str.port}/{self.cnt_str.name}")
+        self.sql_database = SQLDatabase(engine)
+    
+        
+        # Nesse caso, com execção do nome do database, o resto dos campos não é obrigatório
+        self.pgvector_store = PGVectorStore.from_params(
+            database=settings.env('DB_NAME'),
+            host=settings.env('DB_HOST'),
+            port=settings.env('DB_PORT'),
+            user=settings.env('DB_USER'),
+            password=settings.env('DB_PASSWORD'),
+            table_name=cnt_str.name
         )
         self.storage_context = StorageContext.from_defaults(vector_store=self.pgvector_store)
 
@@ -433,3 +570,33 @@ async def starts_workflow(
 
     return response
 
+def generate_postgres_schemas(json_data):
+    # Agrupa as colunas por (schema, tabela)    
+    tables = {}
+    for entry in json_data:
+        schema = entry['schema_name']
+        table = entry['table_name']
+        column = entry['column_name']
+        column_type = entry['column_type']
+        
+        key = (schema, table)
+        if key not in tables:
+            tables[key] = []
+        tables[key].append(f'    "{column}" {column_type}')
+    
+    # Gera os comandos SQL para cada tabela e os armazena numa lista
+    schemas = []
+    for (schema, table), columns in tables.items():
+        sql = f'CREATE SCHEMA IF NOT EXISTS "{schema}";\n'
+        sql += f'CREATE TABLE IF NOT EXISTS "{schema}"."{table}" (\n'
+        sql += ",\n".join(columns)
+        sql += "\n);"
+        schemas.append({"schema": sql, "table_name": table})
+    
+    return schemas
+
+
+# json = [{"schema_name" : "public", "table_name" : "data_vector", "column_name" : "embedding", "column_type" : "USER-DEFINED"}, {"schema_name" : "public", "table_name" : "sec_text_chunk", "column_name" : "page_label", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_group_permissions", "column_name" : "group_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_group_permissions", "column_name" : "permission_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_user_groups", "column_name" : "id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "auth_user_groups", "column_name" : "user_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_user_groups", "column_name" : "group_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_user_user_permissions", "column_name" : "id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "auth_user_user_permissions", "column_name" : "user_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_user_user_permissions", "column_name" : "permission_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "last_login", "column_type" : "timestamp with time zone"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "is_superuser", "column_type" : "boolean"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "is_staff", "column_type" : "boolean"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "is_active", "column_type" : "boolean"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "date_joined", "column_type" : "timestamp with time zone"}, {"schema_name" : "public", "table_name" : "django_admin_log", "column_name" : "id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "django_admin_log", "column_name" : "action_time", "column_type" : "timestamp with time zone"}, {"schema_name" : "public", "table_name" : "django_admin_log", "column_name" : "action_flag", "column_type" : "smallint"}, {"schema_name" : "public", "table_name" : "django_admin_log", "column_name" : "content_type_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "django_admin_log", "column_name" : "user_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "django_session", "column_name" : "expire_date", "column_type" : "timestamp with time zone"}, {"schema_name" : "public", "table_name" : "api_database", "column_name" : "id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "api_database", "column_name" : "port", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "api_database", "column_name" : "have_obj_index", "column_type" : "boolean"}, {"schema_name" : "public", "table_name" : "api_database", "column_name" : "user_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "api_questionanswer", "column_name" : "id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "api_questionanswer", "column_name" : "database_id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "api_table", "column_name" : "id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "api_table", "column_name" : "database_id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "city_stats", "column_name" : "population", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "city_stats2", "column_name" : "population", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "data_vector", "column_name" : "id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "data_vector", "column_name" : "metadata_", "column_type" : "json"}, {"schema_name" : "public", "table_name" : "sec_text_chunk", "column_name" : "id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "sec_text_chunk", "column_name" : "embedding", "column_type" : "USER-DEFINED"}, {"schema_name" : "public", "table_name" : "django_migrations", "column_name" : "id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "django_migrations", "column_name" : "applied", "column_type" : "timestamp with time zone"}, {"schema_name" : "public", "table_name" : "django_content_type", "column_name" : "id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_permission", "column_name" : "id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_permission", "column_name" : "content_type_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_group", "column_name" : "id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_group_permissions", "column_name" : "id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "sec_text_chunk", "column_name" : "file_name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "sec_text_chunk", "column_name" : "text", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "api_database", "column_name" : "host", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "city_stats", "column_name" : "city_name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "django_migrations", "column_name" : "app", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "django_migrations", "column_name" : "name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "data_vector", "column_name" : "node_id", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "city_stats", "column_name" : "country", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "django_content_type", "column_name" : "app_label", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "django_content_type", "column_name" : "model", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "api_questionanswer", "column_name" : "question", "column_type" : "text"}, {"schema_name" : "public", "table_name" : "auth_permission", "column_name" : "name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "django_admin_log", "column_name" : "object_id", "column_type" : "text"}, {"schema_name" : "public", "table_name" : "auth_permission", "column_name" : "codename", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "django_admin_log", "column_name" : "object_repr", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "auth_group", "column_name" : "name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "api_questionanswer", "column_name" : "answer", "column_type" : "text"}, {"schema_name" : "public", "table_name" : "django_admin_log", "column_name" : "change_message", "column_type" : "text"}, {"schema_name" : "public", "table_name" : "api_questionanswer", "column_name" : "query", "column_type" : "text"}, {"schema_name" : "public", "table_name" : "city_stats2", "column_name" : "city_name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "django_session", "column_name" : "session_key", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "django_session", "column_name" : "session_data", "column_type" : "text"}, {"schema_name" : "public", "table_name" : "data_vector", "column_name" : "text", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "api_table", "column_name" : "name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "api_database", "column_name" : "name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "api_database", "column_name" : "username", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "password", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "api_database", "column_name" : "password", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "city_stats2", "column_name" : "country", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "username", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "first_name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "last_name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "email", "column_type" : "character varying"}]
+
+# schemas = generate_postgres_schemas(json)
+# print(schemas)
