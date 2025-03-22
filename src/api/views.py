@@ -117,24 +117,39 @@ class TableList(APIView):
                     database_dict["password"] = db_password
                     connection_string = schemas.DatabaseConnection(**database_dict)    
                     tables = [table.name for table in db_obj.table_set.all()]
-                    retriever = SQLTableRetriever(cnt_str=connection_string, tables=tables, have_obj_index=db_obj.have_obj_index)
+                    retriever = SQLTableRetriever(
+                        cnt_str=connection_string, 
+                        tables=tables, 
+                        have_obj_index=db_obj.have_obj_index
+                    )
                     retriever.add_table_schema(table_serializer.validated_data["name"])
                     table_serializer.save() 
                     if not db_obj.have_obj_index:
                         db_obj.have_obj_index = True
-                        db_obj.save()       
+                        db_obj.save()
+                return Response(table_serializer.data, status=status.HTTP_201_CREATED)       
                     # table_name = data.get("name")
-                return Response(table_serializer.data, status=status.HTTP_201_CREATED)
-            return Response(table_serializer.errors, status=status.HTTP_400_BAD_REQUEST)   
-        # if db_obj.type == "minimal":
-        #     # Apenas o campo schemas é obrigatório, mas os outros podem ficar null
-        #     try: 
-        #         only_schemas = data["schemas"]
-        #     except:
-        #         return Response({"ERROR": "schemas not provided."}, status=status.HTTP_400_BAD_REQUEST)     
-        #     # Chamar a função para formatar o only_schemas para uma lista de schemas
-        #     only_schemas_formatted = generate_postgres_schemas(only_schemas)
-            # subir o only_schemas_formatted
+        if db_obj.type == "minimal":
+            # Apenas o campo schemas é obrigatório, mas os outros podem ficar null
+            try: 
+                only_schemas = data["schemas"]
+            except:
+                return Response({"ERROR": "schemas not provided."}, status=status.HTTP_400_BAD_REQUEST)     
+            # Chamar a função para formatar o only_schemas para uma lista de schemas
+            only_schemas_formatted = generate_postgres_schemas(only_schemas)
+            for value in only_schemas_formatted:
+                # subir o only_schemas_formatted para o PGVector
+                retriever_schema =  SQLSchemaRetriever(value['table_name'])
+                retriever_schema.add_table_schema(value['schema'])
+                data = {}
+                data["database"] = database_dict["id"]
+                data["name"] = value['table_name']
+                table_serializer = TableSerializer(data=data)
+                if table_serializer.is_valid():
+                    table_serializer.save()
+                    return Response(table_serializer.data, status=status.HTTP_201_CREATED)
+        
+        return Response(table_serializer.errors, status=status.HTTP_400_BAD_REQUEST)   
             
     
         

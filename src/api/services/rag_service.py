@@ -31,6 +31,7 @@ from llama_index.core.prompts import ChatPromptTemplate
 from llama_index.core.bridge.pydantic import BaseModel, Field
 from llama_index.llms.openai import OpenAI
 from llama_index.core.llms import ChatMessage
+from llama_index.core.schema import TextNode  # Versões mais novas (modularizadas)
 
 from sqlalchemy import create_engine
 
@@ -258,16 +259,9 @@ class SQLTableRetriever():
         return self.obj_index.as_retriever(similarity_top_k=3, timeout=15).retrieve(query)
     
 class SQLSchemaRetriever():
-    def __init__(self, cnt_str: schemas.DatabaseConnection, tables: List[str], have_obj_index: bool):
-        self.cnt_str = cnt_str
-        self.tables = tables
-        self.have_obj_index = have_obj_index
-        self.obj_index = None
-        
-        engine = create_engine(f"postgresql://{self.cnt_str.username}:{self.cnt_str.password}@{self.cnt_str.host}:{self.cnt_str.port}/{self.cnt_str.name}")
-        self.sql_database = SQLDatabase(engine)
-    
-        
+    def __init__(self, table_name: str):
+        self.table_name = table_name
+
         # Nesse caso, com execção do nome do database, o resto dos campos não é obrigatório
         self.pgvector_store = PGVectorStore.from_params(
             database=settings.env('DB_NAME'),
@@ -275,7 +269,7 @@ class SQLSchemaRetriever():
             port=settings.env('DB_PORT'),
             user=settings.env('DB_USER'),
             password=settings.env('DB_PASSWORD'),
-            table_name=cnt_str.name
+            table_name=self.table_name,
         )
         self.storage_context = StorageContext.from_defaults(vector_store=self.pgvector_store)
 
@@ -318,27 +312,30 @@ class SQLSchemaRetriever():
             print(f"Erro ao carregar índice do PGVector: {e}")
             self.obj_index = None  # Evita erro caso não haja índice salvo
 
-    def add_table_schema(self, new_table_name):
-        if not self.have_obj_index:
-            table_node_mapping = SQLTableNodeMapping(self.sql_database)
-            tables_info = [schemas.TableInfo(table_name=new_table_name)]
-            # tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
-            # print("\n\ntables_info schema: ", tables_info)    
-            table_schema_objs = [
-                SQLTableSchema(table_name=t.table_name)
-                for t in tables_info
-            ]
-            # print("\n\ntable_schema_objs: ", table_schema_objs)
-            self.obj_index = ObjectIndex.from_objects(
-                objects=table_schema_objs,
-                object_mapping=table_node_mapping,
-                index_cls=VectorStoreIndex,
-                storage_context=self.storage_context
-            )
-        if self.have_obj_index:    
-            self.obj_index = self.adding_existing_index(new_table_name)
-            # print("self.obj_index: ", self.obj_index)
-            # Se for diferente de None
+    def add_table_schema(self, new_table_schema):
+        # Criar um nó de texto com o schema fornecido
+        node = TextNode(
+            text=new_table_schema,
+            metadata={
+                "table_name": self.table_name,
+                "type": "schema_definition"
+            }
+        )
+        
+        # Criar ou carregar o índice existente
+        index = VectorStoreIndex.from_vector_store(
+            vector_store=self.pgvector_store
+            # service_context=ServiceContext.from_defaults(
+            #     embed_model=Settings.embed_model  # Assume configuração prévia do embed_model
+            # )
+        )
+        
+        # Inserir o nó no índice
+        index.insert_nodes([node])
+        
+        # Opcional: persistir as alterações no armazenamento
+        # self.pgvector_store.persist(persist_dir=f"storage/{self.table_name}")
+            
 
     def delete_table_schema(self, table_to_delete):
         # Clear no data_vector
