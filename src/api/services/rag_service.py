@@ -259,8 +259,8 @@ class SQLTableRetriever():
         return self.obj_index.as_retriever(similarity_top_k=3, timeout=15).retrieve(query)
     
 class SQLSchemaRetriever():
-    def __init__(self, table_name: str):
-        self.table_name = table_name
+    def __init__(self, db_name: str):
+        self.db_name = db_name
 
         # Nesse caso, com execção do nome do database, o resto dos campos não é obrigatório
         self.pgvector_store = PGVectorStore.from_params(
@@ -269,7 +269,7 @@ class SQLSchemaRetriever():
             port=settings.env('DB_PORT'),
             user=settings.env('DB_USER'),
             password=settings.env('DB_PASSWORD'),
-            table_name=self.table_name,
+            table_name=self.db_name,
         )
         self.storage_context = StorageContext.from_defaults(vector_store=self.pgvector_store)
 
@@ -312,12 +312,12 @@ class SQLSchemaRetriever():
             print(f"Erro ao carregar índice do PGVector: {e}")
             self.obj_index = None  # Evita erro caso não haja índice salvo
 
-    def add_table_schema(self, new_table_schema):
+    def add_table_schema(self, table_name, table_schema):
         # Criar um nó de texto com o schema fornecido
         node = TextNode(
-            text=new_table_schema,
+            text=table_schema,
             metadata={
-                "table_name": self.table_name,
+                "table_name": table_name,
                 "type": "schema_definition"
             }
         )
@@ -325,66 +325,43 @@ class SQLSchemaRetriever():
         # Criar ou carregar o índice existente
         index = VectorStoreIndex.from_vector_store(
             vector_store=self.pgvector_store
-            # service_context=ServiceContext.from_defaults(
-            #     embed_model=Settings.embed_model  # Assume configuração prévia do embed_model
-            # )
         )
         
         # Inserir o nó no índice
         index.insert_nodes([node])
-        
-        # Opcional: persistir as alterações no armazenamento
-        # self.pgvector_store.persist(persist_dir=f"storage/{self.table_name}")
+                  
+
+    def delete_table_schema(self, table_name):
+        """
+        Remove os nós correspondentes ao schema da tabela com base no metadado "table_name".
+        """
+        try:
+            index = VectorStoreIndex.from_vector_store(vector_store=self.pgvector_store)
             
-
-    def delete_table_schema(self, table_to_delete):
-        # Clear no data_vector
-        self.pgvector_store.clear()
-
-        print("-------- delete_table_schema -------")
-
-        print("------------ Self.Tables --------------")
-        print(self.tables)
-
-        # Atualize a lista de tabelas removendo a que deve ser deletada
-        print("NAME table_to_delete: ", table_to_delete)
-        
-        for table in self.tables:
-            print("table names in self.tables: ", table)
-            if table != table_to_delete:
-                print("if atendido!")
+            # Acessa o index_struct (atributo protegido) para obter o mapping de nós
+            index_struct = index._index_struct
+            
+            # Recupera os node_ids presentes no índice
+            node_ids = list(index_struct.nodes_dict.values())
+            
+            # Recupera os nós armazenados no docstore
+            nodes = index._docstore.get_nodes(node_ids)
+            
+            # Filtra os nós que possuem o metadado "table_name" correspondente
+            nodes_to_delete = [node.node_id for node in nodes if node.metadata.get("table_name") == table_name]
+            
+            if nodes_to_delete:
+                # Remove os nós do vector store usando o método delete_nodes do índice
+                index.delete_nodes(nodes_to_delete)
                 
-    
-        # Criando uma lista com as tabelas com nomes diferentes da que a gente está deletando
-        self.tables = [table for table in self.tables if table != table_to_delete]
-        
-        # Recrie o índice com as tabelas restantes
-        table_node_mapping = SQLTableNodeMapping(self.sql_database)
-        tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
-        table_schema_objs = [
-            SQLTableSchema(table_name=t.table_name)
-            for t in tables_info
-        ]
-        print("\n")
-        
-        for t in tables_info:
-            print("Nome da tabela:", t)
+                # Opcionalmente, remova também do index_struct e docstore
+                for node_id in nodes_to_delete:
+                    index_struct.delete(node_id)
+                    index._docstore.delete_document(node_id, raise_error=False)
+        except Exception as e:
+            print(f"Erro ao deletar schema do PGVector: {e}")
 
-        print("\n")
-        print("self.storage_context:", self.storage_context)
-        print("\n") 
-        print("table_schema_objs:", table_schema_objs)
-        print("\n") 
-        
-        
-        self.obj_index = ObjectIndex.from_objects(
-            objects=table_schema_objs,
-            object_mapping=table_node_mapping,
-            index_cls=VectorStoreIndex,
-            storage_context=self.storage_context
-        )
-        
-        print(f"Tabela '{table_to_delete}' removida e index atualizado.")
+
         
     def retrieve(self, query: str) -> List[SQLTableSchema]:    
         self.obj_index = self.load_existing_index()

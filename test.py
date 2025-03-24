@@ -1,5 +1,5 @@
 def generate_postgres_schemas(json_data):
-    # Agrupa as colunas por (schema, tabela)
+    # Agrupa as colunas por (schema, tabela)    
     tables = {}
     for entry in json_data:
         schema = entry['schema_name']
@@ -19,7 +19,7 @@ def generate_postgres_schemas(json_data):
         sql += f'CREATE TABLE IF NOT EXISTS "{schema}"."{table}" (\n'
         sql += ",\n".join(columns)
         sql += "\n);"
-        schemas.append(sql)
+        schemas.append({"schema": sql, "table_name": table})
     
     return schemas
 

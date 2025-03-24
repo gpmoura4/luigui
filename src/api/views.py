@@ -89,71 +89,94 @@ class DatabaseDetail(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class TableList(APIView):    
+class TableList(APIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerTable]
+
     def post(self, request, database, format=None):
-        # Validação da tabela
+        # Busca o objeto Database e converte para dict
         try:
             db_obj = Database.objects.get(id=database)
             database_dict = model_to_dict(db_obj)
-        except:
-            return Response({"ERROR": "Database not found."}, status=status.HTTP_404_NOT_FOUND)    
+        except Database.DoesNotExist:
+            return Response({"ERROR": "Database not found."}, status=status.HTTP_404_NOT_FOUND)
+        
         data = request.data
+        
+        # Caso o database seja do tipo "complete"
         if db_obj.type == "complete":
-            try: 
+            try:
                 db_password = data["db_password"]
-            except:
-                return Response({"ERROR": "db_password password not provided."}, status=status.HTTP_400_BAD_REQUEST)     
+            except KeyError:
+                return Response({"ERROR": "db_password not provided."}, status=status.HTTP_400_BAD_REQUEST)
+            
             table_name = data.get("name")
             if db_obj.table_set.filter(name=table_name).exists():
                 return Response({"ERROR": "Table with this name already exists."}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Inserindo a tabela 
+            
+            # Prepara os dados para o serializer e remove o campo de senha do payload
             data["database"] = database_dict["id"]
             data.pop("db_password", None)
             table_serializer = TableSerializer(data=data)
-            if table_serializer.is_valid(): 
+            
+            if table_serializer.is_valid():
                 if db_obj.check_password(db_password):
                     database_dict["password"] = db_password
-                    connection_string = schemas.DatabaseConnection(**database_dict)    
+                    connection_string = schemas.DatabaseConnection(**database_dict)
                     tables = [table.name for table in db_obj.table_set.all()]
                     retriever = SQLTableRetriever(
-                        cnt_str=connection_string, 
-                        tables=tables, 
+                        cnt_str=connection_string,
+                        tables=tables,
                         have_obj_index=db_obj.have_obj_index
                     )
+                    # Adiciona o schema da nova tabela ao índice do PGVector
                     retriever.add_table_schema(table_serializer.validated_data["name"])
-                    table_serializer.save() 
+                    
+                    table_serializer.save()
+                    
+                    # Se ainda não tiver o índice salvo, atualiza o flag
                     if not db_obj.have_obj_index:
                         db_obj.have_obj_index = True
                         db_obj.save()
-                return Response(table_serializer.data, status=status.HTTP_201_CREATED)       
-                    # table_name = data.get("name")
-        if db_obj.type == "minimal":
-            # Apenas o campo schemas é obrigatório, mas os outros podem ficar null
-            try: 
-                only_schemas = data["schemas"]
-            except:
-                return Response({"ERROR": "schemas not provided."}, status=status.HTTP_400_BAD_REQUEST)     
-            # Chamar a função para formatar o only_schemas para uma lista de schemas
-            only_schemas_formatted = generate_postgres_schemas(only_schemas)
-            for value in only_schemas_formatted:
-                # subir o only_schemas_formatted para o PGVector
-                retriever_schema =  SQLSchemaRetriever(value['table_name'])
-                retriever_schema.add_table_schema(value['schema'])
-                data = {}
-                data["database"] = database_dict["id"]
-                data["name"] = value['table_name']
-                table_serializer = TableSerializer(data=data)
-                if table_serializer.is_valid():
-                    table_serializer.save()
+                    
                     return Response(table_serializer.data, status=status.HTTP_201_CREATED)
-        
-        return Response(table_serializer.errors, status=status.HTTP_400_BAD_REQUEST)   
             
-    
+            return Response(table_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-
+        # Caso o database seja do tipo "minimal"
+        if db_obj.type == "minimal":
+            try:
+                only_schemas = data["schemas"]
+            except KeyError:
+                return Response({"ERROR": "schemas not provided."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Gera a lista de schemas a partir do JSON enviado
+            only_schemas_formatted = generate_postgres_schemas(only_schemas)
+            
+            results = []
+            # Instancia o retriever apenas uma vez para o database em questão
+            retriever_schema = SQLSchemaRetriever(database_dict["name"])
+            
+            for value in only_schemas_formatted:
+                table_data = {
+                    "database": database_dict["id"],
+                    "name": value['table_name']
+                }
+                table_serializer = TableSerializer(data=table_data)
+                
+                if table_serializer.is_valid():
+                    # Salva o registro e adiciona o schema ao PGVector
+                    table_serializer.save()
+                    retriever_schema.add_table_schema(value['table_name'], value['schema'])
+                    results.append(table_serializer.data)
+                else:
+                    # Caso ocorra erro de validação, adiciona os erros ao resultado
+                    results.append({"errors": table_serializer.errors})
+            
+            return Response(results, status=status.HTTP_201_CREATED)
+        
+        return Response({"ERROR": "Invalid database type."}, status=status.HTTP_400_BAD_REQUEST)
+ 
+        
     
     def get(self, request, database, format=None):
         if request.user.is_authenticated:        
@@ -212,7 +235,7 @@ class TableDetail(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, database, pk, format=None):
-        # Primeiro, verifica se o database existe
+        # Verifica se o database existe
         try:
             db_obj = Database.objects.get(id=database)
         except Database.DoesNotExist:
@@ -221,17 +244,26 @@ class TableDetail(APIView):
         # Recupera a tabela com a verificação de permissão
         table = self.get_object(database, pk)
         
-        # Prepara a conexão para manipulação do schema da tabela
-        database_dict = model_to_dict(db_obj)
-        connection_string = schemas.DatabaseConnection(**database_dict)
-        tables = [table_obj.name for table_obj in db_obj.table_set.all()]
-        retriever = SQLTableRetriever(cnt_str=connection_string, tables=tables, have_obj_index=db_obj.have_obj_index)
+        # Para manipular o schema, preparamos a conexão ou instanciamos o retriever conforme o tipo
+        if db_obj.type == "complete":
+            # Para conexões completas, utiliza o SQLTableRetriever (supondo que ele tenha o método delete_table_schema)
+            database_dict = model_to_dict(db_obj)
+            connection_string = schemas.DatabaseConnection(**database_dict)
+            tables = [table_obj.name for table_obj in db_obj.table_set.all()]
+            retriever = SQLTableRetriever(cnt_str=connection_string, tables=tables, have_obj_index=db_obj.have_obj_index)
+            retriever.delete_table_schema(table.name)
+        elif db_obj.type == "minimal":
+            # Para o modo minimal, utiliza o SQLSchemaRetriever
+            retriever = SQLSchemaRetriever(db_obj.name)
+            retriever.delete_table_schema(table.name)
+        else:
+            return Response({"ERROR": "Invalid database type."}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Remove a definição do schema e deleta a tabela
-        retriever.delete_table_schema(table.name)
+        # Remove o registro da tabela do banco de dados
         table.delete()
         
         return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 
 # class TableDetail(APIView):
