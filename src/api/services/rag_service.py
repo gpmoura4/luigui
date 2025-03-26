@@ -64,7 +64,7 @@ class IPromptStrategy(Protocol):
 class TextToSQLPromptStrategy(IPromptStrategy):
     def __init__(self, engine):
         self.base_prompt = DEFAULT_TEXT_TO_SQL_PROMPT.partial_format(
-            dialect=engine.dialect.name
+            dialect=engine
         )
     
     def create_prompt(self, kwargs: Any) -> str:
@@ -299,18 +299,10 @@ class SQLSchemaRetriever():
     def load_existing_index(self):
         """Carrega o índice existente do PGVector, se houver"""
         try:
-            tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
-            # print("\n\ntables_info schema load: ", tables_info)    
-            table_schema_objs = [
-                SQLTableSchema(table_name=t.table_name)
-                for t in tables_info
-            ]
-            table_node_mapping = SQLTableNodeMapping(self.sql_database)
-            index = VectorStoreIndex.from_vector_store(vector_store=self.pgvector_store)
-            return ObjectIndex.from_objects_and_index(objects=table_schema_objs, object_mapping=table_node_mapping, index=index)
+            return VectorStoreIndex.from_vector_store(vector_store=self.pgvector_store)
         except Exception as e:
             print(f"Erro ao carregar índice do PGVector: {e}")
-            self.obj_index = None  # Evita erro caso não haja índice salvo
+            self.pgvector_store = None  # Evita erro caso não haja índice salvo
 
     def add_table_schema(self, table_name, table_schema):
         # Criar um nó de texto com o schema fornecido
@@ -364,8 +356,8 @@ class SQLSchemaRetriever():
 
         
     def retrieve(self, query: str) -> List[SQLTableSchema]:    
-        self.obj_index = self.load_existing_index()
-        return self.obj_index.as_retriever(similarity_top_k=3, timeout=15).retrieve(query)
+        self.pgvector_store = self.load_existing_index()
+        return self.pgvector_store.as_retriever(similarity_top_k=3, timeout=15).retrieve(query)
 
 
     
@@ -420,6 +412,89 @@ class TextToSQLWorkflow(Workflow):
         # print("--------- generate_sql step test")
         kwargs = {
             "context": ev.table_context_str,
+            "query": ev.query,
+        }
+        chat_response = self.sql_generator.generate(kwargs)
+        sql = self._parse_response_to_sql(chat_response)
+        print(" ---------------- generate_sql return:", schemas.TextToSQLEvent(sql=sql, query=ev.query))
+
+        result = schemas.TextToSQLEvent(sql=sql, query=ev.query)
+        return StopEvent(result=result)
+
+    
+    def _get_table_context_str(self, table_schema_objs: List[SQLTableSchema]) -> str:
+        """Get table context string."""
+        # print("--------- _get_table_context_str step test")
+        context_strs = []
+        for table_schema_obj in table_schema_objs:
+            table_info = self.sql_database.get_single_table_info(
+                table_schema_obj.table_name
+            )
+            if table_schema_obj.context_str:
+                table_opt_context = " The table description is: "
+                table_opt_context += table_schema_obj.context_str
+                table_info += table_opt_context
+
+            context_strs.append(table_info)
+            print(" ---------------- _get_table_context_str return:", "\n\n".join(context_strs))
+        return "\n\n".join(context_strs)
+    
+    def _parse_response_to_sql(self, chat_response: ChatResponse) -> str:
+        """Parse response to SQL."""
+        response = chat_response.message.content
+        sql_query_start = response.find("SQLQuery:")
+    
+        if sql_query_start != -1:
+            response = response[sql_query_start:].removeprefix("SQLQuery:")
+    
+        sql_result_start = response.find("SQLResult:")
+        if sql_result_start != -1:
+            response = response[:sql_result_start]
+
+        # Garantir remoção completa dos caracteres ```
+        response = response.strip()
+        if response.startswith("```") and response.endswith("```"):
+            response = response[3:-3].strip()
+
+        print(" ---------------- _parse_response_to_sql return:", response)
+        return response
+    
+class SimpleTextToSQLWorkflow(Workflow):
+    """Text-to-SQL Workflow that does query-time table retrieval."""
+
+    def __init__(
+        self,
+        schema_retriever: SQLSchemaRetriever,    
+        sql_generator: OpenAISQLGenerator,
+        *args,
+        **kwargs,
+    ) -> None:
+        """Init params."""
+        super().__init__(*args, **kwargs, timeout=30)
+        self.schema_retriever = schema_retriever
+        self.sql_generator = sql_generator
+    
+    @step
+    def retrieve_tables(
+        self, ctx: Context, ev: StartEvent
+    ) -> schemas.SchemaRetrieveEvent:
+        """Retrieve tables."""
+    
+        table_schema = self.schema_retriever.retrieve(ev.query)
+    
+        # Retornando o schema e a pergunta do usuário
+        return schemas.SchemaRetrieveEvent(
+            table_schema=table_schema, query=ev.query
+        )
+    
+    @step
+    def generate_sql(
+        self, ctx: Context, ev: schemas.SchemaRetrieveEvent
+    ) -> schemas.TextToSQLEvent:
+        """Generate SQL statement."""
+        # print("--------- generate_sql step test")
+        kwargs = {
+            "context": ev.table_schema,
             "query": ev.query,
         }
         chat_response = self.sql_generator.generate(kwargs)
@@ -544,6 +619,48 @@ async def starts_workflow(
 
     return response
 
+async def starts_simple_workflow(
+        user_question: str, 
+        db_name: str, 
+        ) -> schemas.WorkFlowResult:
+    # engine = create_engine(f"postgresql://{cnt_str.username}:{cnt_str.password}@{cnt_str.host}:{cnt_str.port}/{cnt_str.name}")
+    # sql_database = SQLDatabase(engine)
+
+    schema_retriever = SQLSchemaRetriever(
+        db_name=db_name
+    )
+
+    print("schema_retriever", schema_retriever)
+
+    
+
+    llm=LLMFactory.create_llm("gpt-4o")
+    prompt_strategy=TextToSQLPromptStrategy("postgresql")
+
+    sql_generator = OpenAISQLGenerator(
+        llm=llm,
+        prompt_strategy=prompt_strategy
+    )
+
+    print("sql_generator", sql_generator)
+
+    txt_tosql_workflow = SimpleTextToSQLWorkflow(
+        schema_retriever=schema_retriever,
+        sql_generator=sql_generator,
+    )
+
+    print("txt_tosql_workflow", txt_tosql_workflow)
+
+    response = await txt_tosql_workflow.run(
+        query=user_question,
+        timeout=30
+        )
+
+    print("\n\nResponse: ", response.sql_query)
+    print("\n\n")
+
+    return response
+
 def generate_postgres_schemas(json_data):
     # Agrupa as colunas por (schema, tabela)    
     tables = {}
@@ -568,9 +685,3 @@ def generate_postgres_schemas(json_data):
         schemas.append({"schema": sql, "table_name": table})
     
     return schemas
-
-
-# json = [{"schema_name" : "public", "table_name" : "data_vector", "column_name" : "embedding", "column_type" : "USER-DEFINED"}, {"schema_name" : "public", "table_name" : "sec_text_chunk", "column_name" : "page_label", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_group_permissions", "column_name" : "group_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_group_permissions", "column_name" : "permission_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_user_groups", "column_name" : "id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "auth_user_groups", "column_name" : "user_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_user_groups", "column_name" : "group_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_user_user_permissions", "column_name" : "id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "auth_user_user_permissions", "column_name" : "user_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_user_user_permissions", "column_name" : "permission_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "last_login", "column_type" : "timestamp with time zone"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "is_superuser", "column_type" : "boolean"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "is_staff", "column_type" : "boolean"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "is_active", "column_type" : "boolean"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "date_joined", "column_type" : "timestamp with time zone"}, {"schema_name" : "public", "table_name" : "django_admin_log", "column_name" : "id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "django_admin_log", "column_name" : "action_time", "column_type" : "timestamp with time zone"}, {"schema_name" : "public", "table_name" : "django_admin_log", "column_name" : "action_flag", "column_type" : "smallint"}, {"schema_name" : "public", "table_name" : "django_admin_log", "column_name" : "content_type_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "django_admin_log", "column_name" : "user_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "django_session", "column_name" : "expire_date", "column_type" : "timestamp with time zone"}, {"schema_name" : "public", "table_name" : "api_database", "column_name" : "id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "api_database", "column_name" : "port", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "api_database", "column_name" : "have_obj_index", "column_type" : "boolean"}, {"schema_name" : "public", "table_name" : "api_database", "column_name" : "user_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "api_questionanswer", "column_name" : "id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "api_questionanswer", "column_name" : "database_id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "api_table", "column_name" : "id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "api_table", "column_name" : "database_id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "city_stats", "column_name" : "population", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "city_stats2", "column_name" : "population", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "data_vector", "column_name" : "id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "data_vector", "column_name" : "metadata_", "column_type" : "json"}, {"schema_name" : "public", "table_name" : "sec_text_chunk", "column_name" : "id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "sec_text_chunk", "column_name" : "embedding", "column_type" : "USER-DEFINED"}, {"schema_name" : "public", "table_name" : "django_migrations", "column_name" : "id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "django_migrations", "column_name" : "applied", "column_type" : "timestamp with time zone"}, {"schema_name" : "public", "table_name" : "django_content_type", "column_name" : "id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_permission", "column_name" : "id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_permission", "column_name" : "content_type_id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_group", "column_name" : "id", "column_type" : "integer"}, {"schema_name" : "public", "table_name" : "auth_group_permissions", "column_name" : "id", "column_type" : "bigint"}, {"schema_name" : "public", "table_name" : "sec_text_chunk", "column_name" : "file_name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "sec_text_chunk", "column_name" : "text", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "api_database", "column_name" : "host", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "city_stats", "column_name" : "city_name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "django_migrations", "column_name" : "app", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "django_migrations", "column_name" : "name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "data_vector", "column_name" : "node_id", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "city_stats", "column_name" : "country", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "django_content_type", "column_name" : "app_label", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "django_content_type", "column_name" : "model", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "api_questionanswer", "column_name" : "question", "column_type" : "text"}, {"schema_name" : "public", "table_name" : "auth_permission", "column_name" : "name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "django_admin_log", "column_name" : "object_id", "column_type" : "text"}, {"schema_name" : "public", "table_name" : "auth_permission", "column_name" : "codename", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "django_admin_log", "column_name" : "object_repr", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "auth_group", "column_name" : "name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "api_questionanswer", "column_name" : "answer", "column_type" : "text"}, {"schema_name" : "public", "table_name" : "django_admin_log", "column_name" : "change_message", "column_type" : "text"}, {"schema_name" : "public", "table_name" : "api_questionanswer", "column_name" : "query", "column_type" : "text"}, {"schema_name" : "public", "table_name" : "city_stats2", "column_name" : "city_name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "django_session", "column_name" : "session_key", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "django_session", "column_name" : "session_data", "column_type" : "text"}, {"schema_name" : "public", "table_name" : "data_vector", "column_name" : "text", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "api_table", "column_name" : "name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "api_database", "column_name" : "name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "api_database", "column_name" : "username", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "password", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "api_database", "column_name" : "password", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "city_stats2", "column_name" : "country", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "username", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "first_name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "last_name", "column_type" : "character varying"}, {"schema_name" : "public", "table_name" : "auth_user", "column_name" : "email", "column_type" : "character varying"}]
-
-# schemas = generate_postgres_schemas(json)
-# print(schemas)

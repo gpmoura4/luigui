@@ -14,6 +14,11 @@ class TableRetrieveEvent(Event):
     table_context_str: str
     query: str
 
+class SchemaRetrieveEvent(Event):
+    """Result of running schema retrieval."""
+    table_schema: str
+    query: str
+
 
 class TextToSQLEvent(Event):
     """Text-to-SQL event."""
