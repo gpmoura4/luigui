@@ -417,11 +417,30 @@ class TextToSQLWorkflow(Workflow):
         chat_response = self.sql_generator.generate(kwargs)
         sql = self._parse_response_to_sql(chat_response)
         print(" ---------------- generate_sql return:", schemas.TextToSQLEvent(sql=sql, query=ev.query))
-
-        result = schemas.TextToSQLEvent(sql=sql, query=ev.query)
-        return StopEvent(result=result)
+        return schemas.TextToSQLEvent(sql=sql, query=ev.query)
+    
+    @step
+    def generate_response(self, ctx: Context, ev: schemas.TextToSQLEvent) -> StopEvent:
+        # print("--------- generate_response step test")
+        """Run SQL retrieval and generate response."""
+        
+        #Executar a query no banco
+        query_response = self.sql_run_query.sql_executor.retrieve(ev.sql)
+        print("\nretrieved_schemas: ",query_response)
+        self.sql_generator.change_prompt_strategy(PromptStrategyFactory.create_synthesis_strategy())
+        print("\nself.sql_generator: ",self.sql_generator)
+        kwargs = {
+            "query_str": ev.query, 
+            "sql_query": ev.sql,
+            "context_str": query_response,
+        }
+        chat_response = self.sql_generator.generate(kwargs)
+        response_text = chat_response.message.content
 
     
+        result = schemas.WorkFlowResult(sql_query=ev.sql,response=response_text)
+        return StopEvent(result=result)
+
     def _get_table_context_str(self, table_schema_objs: List[SQLTableSchema]) -> str:
         """Get table context string."""
         # print("--------- _get_table_context_str step test")
@@ -458,6 +477,7 @@ class TextToSQLWorkflow(Workflow):
 
         print(" ---------------- _parse_response_to_sql return:", response)
         return response
+
     
 class SimpleTextToSQLWorkflow(Workflow):
     """Text-to-SQL Workflow that does query-time table retrieval."""
