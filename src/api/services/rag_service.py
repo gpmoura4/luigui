@@ -81,6 +81,7 @@ class OptimizesSQLQueryPromptStrategy(IPromptStrategy):
     def create_prompt(self, kwargs: Any) -> str:
         optimize_sql_query_prompt = (
             "Optimize the following SQL query for better performance. Answer only with a single formatted SQL code block, no additional text. \n"
+            "Schema Information:\n{context}\n"
             "Database: {database}\n" 
             "Query: {query}\n"
             "Answer: \n"
@@ -90,6 +91,7 @@ class OptimizesSQLQueryPromptStrategy(IPromptStrategy):
             optimize_sql_query_prompt,
         ).format_messages(
             query=kwargs["query"],
+            context=kwargs["context"],
             database=self.database,
         )
     
@@ -646,8 +648,6 @@ async def starts_simple_workflow(
         db_name: str, 
         prompt_type: str, 
         ) -> schemas.WorkFlowResult:
-    # engine = create_engine(f"postgresql://{cnt_str.username}:{cnt_str.password}@{cnt_str.host}:{cnt_str.port}/{cnt_str.name}")
-    # sql_database = SQLDatabase(engine)
 
     schema_retriever = SQLSchemaRetriever(
         db_name=db_name
