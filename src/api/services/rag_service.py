@@ -95,6 +95,51 @@ class OptimizesSQLQueryPromptStrategy(IPromptStrategy):
             database=self.database,
         )
     
+
+class ExplainSQLQueryPromptStrategy(IPromptStrategy):
+    def __init__(self, database):
+
+        self.database=database
+    
+    def create_prompt(self, kwargs: Any) -> str:
+        optimize_sql_query_prompt = (
+            "Explain in detail what this SQL query does, including any potential performance implications or areas for improvement: \n"
+            "Schema Information:\n{context}\n"
+            "Database: {database}\n" 
+            "Query: {query}\n"
+            "Answer: \n"
+        )
+        return PromptTemplate(
+            optimize_sql_query_prompt,
+        ).format_messages(
+            query=kwargs["query"],
+            context=kwargs["context"],
+            database=self.database,
+        )
+    
+
+class FixSQLQueryPromptStrategy(IPromptStrategy):
+    def __init__(self, database):
+
+        self.database=database
+    
+    def create_prompt(self, kwargs: Any) -> str:
+        optimize_sql_query_prompt = (
+            "Fix the SQL syntax errors in the following query. Answer only with a single formatted SQL code block, no additional text. The Query: \n"
+            "Schema Information:\n{context}\n"
+            "Database: {database}\n" 
+            "Query: {query}\n"
+            "Answer: \n"
+        )
+        return PromptTemplate(
+            optimize_sql_query_prompt,
+        ).format_messages(
+            query=kwargs["query"],
+            context=kwargs["context"],
+            database=self.database,
+        )
+
+    
 class ResponseSynthesisPromptStrategy(IPromptStrategy):
     def create_prompt(self, kwargs: Any) -> str:
         response_synthesis_prompt_str = (
@@ -121,6 +166,18 @@ class PromptStrategyFactory:
     @staticmethod
     def create_synthesis_strategy() -> IPromptStrategy:
         return ResponseSynthesisPromptStrategy()
+    
+    @staticmethod
+    def create_optimizesql_strategy(database) -> IPromptStrategy:
+        return OptimizesSQLQueryPromptStrategy(database)
+    
+    @staticmethod
+    def create_explainsql_strategy(database) -> IPromptStrategy:
+        return ExplainSQLQueryPromptStrategy(database)
+    
+    @staticmethod
+    def create_fixsql_strategy(database) -> IPromptStrategy:
+        return FixSQLQueryPromptStrategy(database)
 
 
 class OpenAISQLGenerator():
@@ -658,11 +715,15 @@ async def starts_simple_workflow(
     
 
     llm=LLMFactory.create_llm("gpt-4o")
-    # Mudando o prompt para cada tipo de prompt do usuário
+    
     if prompt_type == "text_to_sql":
         prompt_strategy=TextToSQLPromptStrategy("postgresql")
     if prompt_type == "optimize_sql":
         prompt_strategy=OptimizesSQLQueryPromptStrategy("postgresql")
+    if prompt_type == "explain_sql":
+        prompt_strategy=ExplainSQLQueryPromptStrategy("postgresql")
+    if prompt_type == "fix_sql":
+        prompt_strategy=FixSQLQueryPromptStrategy("postgresql")
 
     sql_generator = OpenAISQLGenerator(
         llm=llm,
