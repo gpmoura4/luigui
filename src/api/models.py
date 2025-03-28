@@ -60,3 +60,4 @@ class QuestionAnswer(models.Model):
     question = models.TextField( verbose_name='User Natural Language Question')
     answer = models.TextField( verbose_name='RAG Answer', null=True, blank=True)
     query = models.TextField( verbose_name='SQL Query', null=True, blank=True)
+    prompt_type = models.CharField( max_length=255, verbose_name='SQL Prompt Type')
