@@ -77,7 +77,7 @@ class TableSerializer(serializers.ModelSerializer):
 class QuestionAnswerSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuestionAnswer
-        fields = ["database", "question", "answer", "query"]
+        fields = ["database", "question", "answer", "query", "prompt_type"]
         extra_kwargs = {
             "answer": {"read_only": True},
             "query": {"read_only": True},

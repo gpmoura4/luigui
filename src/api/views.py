@@ -275,7 +275,7 @@ class QuestionAnswerList(APIView):
         except:
             return Response({"ERROR":"Database not found"}, status=status.HTTP_404_NOT_FOUND)    
         data = request.data 
-       
+ 
         if db_obj.type == "complete":
             try: 
                 print("question answer try db_password")
@@ -320,6 +320,7 @@ class QuestionAnswerList(APIView):
                 response = asyncio.run(starts_simple_workflow(     
                     user_question=data["question"],
                     db_name=db_obj.name,
+                    prompt_type=data["prompt_type"]
                 ))
                 # print("VIEW response", response)
                 print("--------- view question linha 3")

@@ -73,6 +73,26 @@ class TextToSQLPromptStrategy(IPromptStrategy):
         )
 
 
+class OptimizesSQLQueryPromptStrategy(IPromptStrategy):
+    def __init__(self, database):
+
+        self.database=database
+    
+    def create_prompt(self, kwargs: Any) -> str:
+        optimize_sql_query_prompt = (
+            "Optimize the following SQL query for better performance. Answer only with a single formatted SQL code block, no additional text. \n"
+            "Database: {database}\n" 
+            "Query: {query}\n"
+            "Answer: \n"
+            "SELECT"
+        )
+        return PromptTemplate(
+            optimize_sql_query_prompt,
+        ).format_messages(
+            query=kwargs["query"],
+            database=self.database,
+        )
+    
 class ResponseSynthesisPromptStrategy(IPromptStrategy):
     def create_prompt(self, kwargs: Any) -> str:
         response_synthesis_prompt_str = (
@@ -624,6 +644,7 @@ async def starts_workflow(
 async def starts_simple_workflow(
         user_question: str, 
         db_name: str, 
+        prompt_type: str, 
         ) -> schemas.WorkFlowResult:
     # engine = create_engine(f"postgresql://{cnt_str.username}:{cnt_str.password}@{cnt_str.host}:{cnt_str.port}/{cnt_str.name}")
     # sql_database = SQLDatabase(engine)
@@ -637,7 +658,11 @@ async def starts_simple_workflow(
     
 
     llm=LLMFactory.create_llm("gpt-4o")
-    prompt_strategy=TextToSQLPromptStrategy("postgresql")
+    # Mudando o prompt para cada tipo de prompt do usuário
+    if prompt_type == "text_to_sql":
+        prompt_strategy=TextToSQLPromptStrategy("postgresql")
+    if prompt_type == "optimize_sql":
+        prompt_strategy=OptimizesSQLQueryPromptStrategy("postgresql")
 
     sql_generator = OpenAISQLGenerator(
         llm=llm,
