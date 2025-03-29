@@ -300,12 +300,17 @@ class QuestionAnswerList(APIView):
                         cnt_str=connection_string, 
                         tables=tables, 
                         user_question=data["question"],
-                        have_obj_index=db_obj.have_obj_index
+                        have_obj_index=db_obj.have_obj_index,
+                        prompt_type=data["prompt_type"]
                     ))
                     print("VIEW response", response)
                     print("--------- view question linha 3")
-                    serializer.validated_data["answer"] = response.response
-                    serializer.validated_data["query"] = response.sql_query
+                    if data["prompt_type"] == "text_to_sql":
+                        serializer.validated_data["answer"] = response.response
+                        serializer.validated_data["query"] = response.sql_query
+                    else:
+                        serializer.validated_data["answer"] = response.sql
+                        serializer.validated_data["query"] = ""
                     serializer.save()
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)    

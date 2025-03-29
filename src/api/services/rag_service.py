@@ -457,6 +457,7 @@ class TextToSQLWorkflow(Workflow):
         sql_run_query: SQLRunQuery,
         sql_generator: OpenAISQLGenerator,
         sql_database,
+        prompt_type: str,
         *args,
         **kwargs,
     ) -> None:
@@ -466,6 +467,7 @@ class TextToSQLWorkflow(Workflow):
         self.sql_run_query = sql_run_query
         self.sql_generator = sql_generator
         self.sql_database = sql_database
+        self.prompt_type = prompt_type
     
     @step
     def retrieve_tables(
@@ -486,17 +488,34 @@ class TextToSQLWorkflow(Workflow):
     @step
     def generate_sql(
         self, ctx: Context, ev: schemas.TableRetrieveEvent
-    ) -> schemas.TextToSQLEvent:
+    ) -> schemas.TextToSQLEvent | StopEvent:
         """Generate SQL statement."""
         # print("--------- generate_sql step test")
-        kwargs = {
-            "context": ev.table_context_str,
-            "query": ev.query,
-        }
-        chat_response = self.sql_generator.generate(kwargs)
-        sql = self._parse_response_to_sql(chat_response)
-        print(" ---------------- generate_sql return:", schemas.TextToSQLEvent(sql=sql, query=ev.query))
-        return schemas.TextToSQLEvent(sql=sql, query=ev.query)
+        if self.prompt_type == "text_to_sql":
+            kwargs = {
+                "context": ev.table_context_str,
+                "query": ev.query,
+            }
+            chat_response = self.sql_generator.generate(kwargs)
+            sql = self._parse_response_to_sql(chat_response)
+            print(" ---------------- generate_sql return:", schemas.TextToSQLEvent(sql=sql, query=ev.query))
+            return schemas.TextToSQLEvent(sql=sql, query=ev.query)
+        else:
+            print("--------- generate_sql step test 1")
+            kwargs = {
+                "context": ev.table_context_str,
+                "query": ev.query,
+            }
+            print("--------- generate_sql step test 1")
+            chat_response = self.sql_generator.generate(kwargs)
+            print("--------- generate_sql step test 1")
+            sql = self._parse_response_to_sql(chat_response)
+            print(" ---------------- generate_sql return:", schemas.TextToSQLEvent(sql=sql, query=ev.query))
+            
+            result = schemas.TextToSQLEvent(sql=sql, query=ev.query)
+            print(" ---------------- generate_sql result:", result)
+            return StopEvent(result=result)
+
     
     @step
     def generate_response(self, ctx: Context, ev: schemas.TextToSQLEvent) -> StopEvent:
@@ -652,7 +671,8 @@ async def starts_workflow(
         cnt_str: schemas.DatabaseConnection, 
         tables: List[str], 
         user_question: str, 
-        have_obj_index: bool
+        have_obj_index: bool,
+        prompt_type: str
         ) -> schemas.WorkFlowResult:
     engine = create_engine(f"postgresql://{cnt_str.username}:{cnt_str.password}@{cnt_str.host}:{cnt_str.port}/{cnt_str.name}")
     sql_database = SQLDatabase(engine)
@@ -672,7 +692,15 @@ async def starts_workflow(
     print("sql_run_query", sql_run_query)
 
     llm=LLMFactory.create_llm("gpt-4o")
-    prompt_strategy=TextToSQLPromptStrategy(engine)
+
+    if prompt_type == "text_to_sql":
+        prompt_strategy=TextToSQLPromptStrategy("postgresql")
+    if prompt_type == "optimize_sql":
+        prompt_strategy=OptimizesSQLQueryPromptStrategy("postgresql")
+    if prompt_type == "explain_sql":
+        prompt_strategy=ExplainSQLQueryPromptStrategy("postgresql")
+    if prompt_type == "fix_sql":
+        prompt_strategy=FixSQLQueryPromptStrategy("postgresql")
 
     sql_generator = OpenAISQLGenerator(
         llm=llm,
@@ -685,7 +713,8 @@ async def starts_workflow(
         obj_retriever=obj_retriever,
         sql_run_query=sql_run_query,
         sql_generator=sql_generator,
-        sql_database=sql_database
+        sql_database=sql_database,
+        prompt_type=prompt_type
     )
 
     print("txt_tosql_workflow", txt_tosql_workflow)
@@ -693,11 +722,7 @@ async def starts_workflow(
     response = await txt_tosql_workflow.run(
         query=user_question,
         timeout=30
-        )
-
-    print("\n\nResponse: ", response.sql_query)
-    print("\n\n")
-
+    )
     return response
 
 async def starts_simple_workflow(
