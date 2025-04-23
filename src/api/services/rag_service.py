@@ -214,12 +214,12 @@ class SQLTableRetriever():
     
         
         self.pgvector_store = PGVectorStore.from_params(
-            database=settings.env('DB_NAME'),
-            host=settings.env('DB_HOST'),
-            port=settings.env('DB_PORT'),
-            user=settings.env('DB_USER'),
-            password=settings.env('DB_PASSWORD'),
-            table_name=cnt_str.name
+            database=cnt_str.name,
+            host=cnt_str.host,
+            port=cnt_str.port,
+            user=cnt_str.username,
+            password=cnt_str.password,
+            table_name=""+cnt_str.name
         )
         self.storage_context = StorageContext.from_defaults(vector_store=self.pgvector_store)
 
@@ -336,6 +336,7 @@ class SQLTableRetriever():
     def retrieve(self, query: str) -> List[SQLTableSchema]:    
         self.obj_index = self.load_existing_index()
         return self.obj_index.as_retriever(similarity_top_k=3, timeout=15).retrieve(query)
+
     
 class SQLSchemaRetriever():
     def __init__(self, db_name: str):
