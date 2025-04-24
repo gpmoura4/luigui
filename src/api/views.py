@@ -306,7 +306,7 @@ class QuestionAnswerList(APIView):
                     print("VIEW response", response)
                     print("--------- view question linha 3")
                     if data["prompt_type"] == "text_to_sql":
-                        serializer.validated_data["answer"] = response.response
+                        serializer.validated_data["answer"] = response.natural_language_response
                         serializer.validated_data["query"] = response.sql_query
                     else:
                         serializer.validated_data["answer"] = response.sql
