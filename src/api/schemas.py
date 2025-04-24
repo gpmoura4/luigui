@@ -22,12 +22,12 @@ class SchemaRetrieveEvent(Event):
 
 class TextToSQLEvent(Event):
     """Text-to-SQL event."""
-    sql: str
-    query: str
-
-class WorkFlowResult(Event):
+    natural_language_query: str
     sql_query: str
-    response: str
+
+class SynthesisResult(Event):
+    sql_query: str
+    natural_language_response: str
 
 class DatabaseConnection(BaseModel):
     """Database connection information."""
