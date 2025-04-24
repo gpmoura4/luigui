@@ -29,7 +29,7 @@ from llama_index.core.llms import ChatResponse
 
 from llama_index.core.prompts import ChatPromptTemplate
 from llama_index.core.bridge.pydantic import BaseModel, Field
-from llama_index.llms.openai import OpenAI
+# from llama_index.llms.openai import OpenAI
 from llama_index.core.llms import ChatMessage
 from llama_index.core.schema import TextNode  # Versões mais novas (modularizadas)
 
@@ -42,7 +42,7 @@ from api import schemas
 from api.models import Database
 
 import os
-import openai
+from openai import OpenAI
 from core import settings
 
 from dotenv import load_dotenv
@@ -51,7 +51,7 @@ from pathlib import Path
 
 load_dotenv()
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+OpenAI.api_key = os.getenv("OPENAI_API_KEY")
 
 
 class IPromptStrategy(Protocol):
@@ -60,17 +60,31 @@ class IPromptStrategy(Protocol):
         """Interface para estratégias de prompt"""
         pass
 
+    @abstractmethod
+    def function_name(self) -> str:
+        """Nome da função para function-calling."""
+        pass
+
+    @abstractmethod
+    def function_schema(self) -> dict:
+        """JSON Schema dos parâmetros de saída."""
+        pass
+
+
 
 class TextToSQLPromptStrategy(IPromptStrategy):
     def __init__(self, engine):
-        self.base_prompt = DEFAULT_TEXT_TO_SQL_PROMPT.partial_format(
-            dialect=engine
-        )
-    
+        self.base_prompt = DEFAULT_TEXT_TO_SQL_PROMPT.partial_format(dialect=engine)
+
     def create_prompt(self, kwargs: Any) -> str:
-        return self.base_prompt.format_messages(
-            query_str=kwargs["query"], schema=kwargs["context"]
-        )
+        return self.base_prompt.format_messages(query_str=kwargs["query"], schema=kwargs["context"])
+
+    def function_name(self) -> str:
+        return "text_to_sql"
+
+    def function_schema(self) -> dict:
+        return schemas.TextToSQLEvent.model_json_schema()
+
 
 
 class OptimizesSQLQueryPromptStrategy(IPromptStrategy):
@@ -156,6 +170,12 @@ class ResponseSynthesisPromptStrategy(IPromptStrategy):
             sql_query=kwargs["sql_query"],
             context_str=kwargs["context_str"]
         )
+    
+    def function_name(self) -> str:
+        return "synthesize_response"
+
+    def function_schema(self) -> dict:
+        return schemas.SynthesisResult.model_json_schema()
 
 
 class PromptStrategyFactory:
@@ -180,26 +200,52 @@ class PromptStrategyFactory:
         return FixSQLQueryPromptStrategy(database)
 
 
-class OpenAISQLGenerator():
+class OpenAISQLGenerator:
     def __init__(self, llm, prompt_strategy: IPromptStrategy):
         self.llm = llm
         self.prompt_strategy = prompt_strategy
-    
+
     def change_prompt_strategy(self, new_strategy: IPromptStrategy):
         self.prompt_strategy = new_strategy
-    
-    def generate(self, kwargs) -> str:
-        fmt_messages = self.prompt_strategy.create_prompt(kwargs)
-        print("--------- generate step")
-        print("\n--------- fmt_messages: ", fmt_messages)
-        print("\n--------- kwargs: ", kwargs)
-        return self.llm.chat(fmt_messages)
+
+    def generate(self, kwargs) -> BaseModel:
+        # 1. Cria o prompt de sistema/usuário
+        user_message = {
+            "role": "user",
+            "content": str(self.prompt_strategy.create_prompt(kwargs))
+        }
+
+        # 2. Função “simulada” para structured output
+        func_def = {
+            "name": self.prompt_strategy.function_name(),
+            "description": f"Structured output for {self.prompt_strategy.function_name()}",
+            "parameters": self.prompt_strategy.function_schema()
+        }
+
+        # 3. Chama a ChatCompletion com function-calling
+        response = self.llm.chat.completions.create(
+            model="gpt-4-turbo-2024-04-09",
+            messages=[user_message],
+            functions=[func_def],
+            function_call={"name": self.prompt_strategy.function_name()},
+        )
+
+        # 4. Extrai o JSON retornado e valida com Pydantic
+        func_call = response.choices[0].message.function_call
+        result_json = func_call.arguments
+        ResultModel = {
+            "text_to_sql": schemas.TextToSQLEvent,
+            "synthesize_response": schemas.SynthesisResult,
+        }[self.prompt_strategy.function_name()]
+        print("\n\n\nResultModel: ", ResultModel.model_validate_json(result_json))
+        return ResultModel.model_validate_json(result_json)
 
 
 class LLMFactory:
     @staticmethod
     def create_llm(model: str):
-        return OpenAI(model=model, timeout=20)
+        client = OpenAI()
+        return client
 
 
 class SQLTableRetriever():
@@ -497,25 +543,21 @@ class TextToSQLWorkflow(Workflow):
                 "context": ev.table_context_str,
                 "query": ev.query,
             }
-            chat_response = self.sql_generator.generate(kwargs)
-            sql = self._parse_response_to_sql(chat_response)
-            print(" ---------------- generate_sql return:", schemas.TextToSQLEvent(sql=sql, query=ev.query))
-            return schemas.TextToSQLEvent(sql=sql, query=ev.query)
+            response_event = self.sql_generator.generate(kwargs)
+            # sql = self._parse_response_to_sql(chat_response)
+            # print(" ---------------- generate_sql return:", schemas.TextToSQLEvent(sql=chat_response.sql_query, query=chat_response.natural_language_query))
+            return response_event
         else:
-            print("--------- generate_sql step test 1")
             kwargs = {
                 "context": ev.table_context_str,
                 "query": ev.query,
             }
-            print("--------- generate_sql step test 1")
             chat_response = self.sql_generator.generate(kwargs)
-            print("--------- generate_sql step test 1")
-            sql = self._parse_response_to_sql(chat_response)
-            print(" ---------------- generate_sql return:", schemas.TextToSQLEvent(sql=sql, query=ev.query))
+            # sql = self._parse_response_to_sql(chat_response)
             
-            result = schemas.TextToSQLEvent(sql=sql, query=ev.query)
-            print(" ---------------- generate_sql result:", result)
-            return StopEvent(result=result)
+            # result = schemas.TextToSQLEvent(sql=sql, query=ev.query)
+            # print(" ---------------- generate_sql result:", result)
+            return StopEvent(result=chat_response)
 
     
     @step
@@ -524,21 +566,20 @@ class TextToSQLWorkflow(Workflow):
         """Run SQL retrieval and generate response."""
         
         #Executar a query no banco
-        query_response = self.sql_run_query.sql_executor.retrieve(ev.sql)
+        query_response = self.sql_run_query.sql_executor.retrieve(ev.sql_query)
         print("\nretrieved_schemas: ",query_response)
         self.sql_generator.change_prompt_strategy(PromptStrategyFactory.create_synthesis_strategy())
         print("\nself.sql_generator: ",self.sql_generator)
         kwargs = {
-            "query_str": ev.query, 
-            "sql_query": ev.sql,
+            "query_str": ev.natural_language_query, 
+            "sql_query": ev.sql_query,
             "context_str": query_response,
         }
-        chat_response = self.sql_generator.generate(kwargs)
-        response_text = chat_response.message.content
+        response_event = self.sql_generator.generate(kwargs)
+        print("\n\nchat_response: ", response_event)
 
-    
-        result = schemas.WorkFlowResult(sql_query=ev.sql,response=response_text)
-        return StopEvent(result=result)
+        # result = schemas.SynthesisResult(sql_query=ev.sql, natural_language_response=response_text)
+        return StopEvent(result=response_event)
 
     def _get_table_context_str(self, table_schema_objs: List[SQLTableSchema]) -> str:
         """Get table context string."""
@@ -674,7 +715,7 @@ async def starts_workflow(
         user_question: str, 
         have_obj_index: bool,
         prompt_type: str
-        ) -> schemas.WorkFlowResult:
+        ) -> schemas.SynthesisResult:
     engine = create_engine(f"postgresql://{cnt_str.username}:{cnt_str.password}@{cnt_str.host}:{cnt_str.port}/{cnt_str.name}")
     sql_database = SQLDatabase(engine)
 
@@ -730,7 +771,7 @@ async def starts_simple_workflow(
         user_question: str, 
         db_name: str, 
         prompt_type: str, 
-        ) -> schemas.WorkFlowResult:
+        ) -> schemas.SynthesisResult:
 
     schema_retriever = SQLSchemaRetriever(
         db_name=db_name
@@ -740,7 +781,7 @@ async def starts_simple_workflow(
 
     
 
-    llm=LLMFactory.create_llm("gpt-4o")
+    llm = LLMFactory.create_llm("gpt-4o")
     
     if prompt_type == "text_to_sql":
         prompt_strategy=TextToSQLPromptStrategy("postgresql")
