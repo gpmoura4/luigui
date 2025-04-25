@@ -591,7 +591,6 @@ class TextToSQLWorkflow(Workflow):
             case _:
                 raise ValueError(f"Unknown prompt_type: {self.prompt_type}")
 
-
     
     @step
     def generate_response(self, ctx: Context, ev: schemas.TextToSQLEvent) -> StopEvent:
@@ -631,26 +630,6 @@ class TextToSQLWorkflow(Workflow):
             print(" ---------------- _get_table_context_str return:", "\n\n".join(context_strs))
         return "\n\n".join(context_strs)
     
-    def _parse_response_to_sql(self, chat_response: ChatResponse) -> str:
-        """Parse response to SQL."""
-        response = chat_response.message.content
-        sql_query_start = response.find("SQLQuery:")
-    
-        if sql_query_start != -1:
-            response = response[sql_query_start:].removeprefix("SQLQuery:")
-    
-        sql_result_start = response.find("SQLResult:")
-        if sql_result_start != -1:
-            response = response[:sql_result_start]
-
-        # Garantir remoção completa dos caracteres ```
-        response = response.strip()
-        if response.startswith("```") and response.endswith("```"):
-            response = response[3:-3].strip()
-
-        print(" ---------------- _parse_response_to_sql return:", response)
-        return response
-
     
 class SimpleTextToSQLWorkflow(Workflow):
     """Text-to-SQL Workflow that does query-time table retrieval."""
@@ -719,27 +698,6 @@ class SimpleTextToSQLWorkflow(Workflow):
             context_strs.append(table_info)
             print(" ---------------- _get_table_context_str return:", "\n\n".join(context_strs))
         return "\n\n".join(context_strs)
-    
-    def _parse_response_to_sql(self, chat_response: ChatResponse) -> str:
-        """Parse response to SQL."""
-        response = chat_response.message.content
-        sql_query_start = response.find("SQLQuery:")
-    
-        if sql_query_start != -1:
-            response = response[sql_query_start:].removeprefix("SQLQuery:")
-    
-        sql_result_start = response.find("SQLResult:")
-        if sql_result_start != -1:
-            response = response[:sql_result_start]
-
-        # Garantir remoção completa dos caracteres ```
-        response = response.strip()
-        if response.startswith("```") and response.endswith("```"):
-            response = response[3:-3].strip()
-
-        print(" ---------------- _parse_response_to_sql return:", response)
-        return response
-
     
 
 async def starts_workflow(
