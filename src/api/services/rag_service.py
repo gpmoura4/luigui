@@ -94,12 +94,11 @@ class OptimizesSQLQueryPromptStrategy(IPromptStrategy):
     
     def create_prompt(self, kwargs: Any) -> str:
         optimize_sql_query_prompt = (
-            "Optimize the following SQL query for better performance. Answer only with a single formatted SQL code block, no additional text. \n"
+            "Optimize the following SQL query for better performance. Return the optimized sql query and an explanation. \n"
             "Schema Information:\n{context}\n"
             "Database: {database}\n" 
             "Query: {query}\n"
             "Answer: \n"
-            "SELECT"
         )
         return PromptTemplate(
             optimize_sql_query_prompt,
@@ -108,6 +107,12 @@ class OptimizesSQLQueryPromptStrategy(IPromptStrategy):
             context=kwargs["context"],
             database=self.database,
         )
+    
+    def function_name(self) -> str:
+        return "optimize_sql"
+
+    def function_schema(self) -> dict:
+        return schemas.OptimizeResult.model_json_schema()
     
 
 class ExplainSQLQueryPromptStrategy(IPromptStrategy):
@@ -121,7 +126,7 @@ class ExplainSQLQueryPromptStrategy(IPromptStrategy):
             "Schema Information:\n{context}\n"
             "Database: {database}\n" 
             "Query: {query}\n"
-            "Answer: \n"
+            "Explanation: \n"
         )
         return PromptTemplate(
             optimize_sql_query_prompt,
@@ -130,6 +135,12 @@ class ExplainSQLQueryPromptStrategy(IPromptStrategy):
             context=kwargs["context"],
             database=self.database,
         )
+    
+    def function_name(self) -> str:
+        return "explain_sql"
+
+    def function_schema(self) -> dict:
+        return schemas.ExplainSQLResult.model_json_schema()
     
 
 class FixSQLQueryPromptStrategy(IPromptStrategy):
@@ -152,6 +163,12 @@ class FixSQLQueryPromptStrategy(IPromptStrategy):
             context=kwargs["context"],
             database=self.database,
         )
+    
+    def function_name(self) -> str:
+        return "fix_sql"
+
+    def function_schema(self) -> dict:
+        return schemas.FixSQLResult.model_json_schema()
 
     
 class ResponseSynthesisPromptStrategy(IPromptStrategy):
@@ -236,6 +253,9 @@ class OpenAISQLGenerator:
         ResultModel = {
             "text_to_sql": schemas.TextToSQLEvent,
             "synthesize_response": schemas.SynthesisResult,
+            "optimize_sql": schemas.OptimizeResult,
+            "explain_sql": schemas.ExplainSQLResult,
+            "fix_sql": schemas.FixSQLResult,
         }[self.prompt_strategy.function_name()]
         print("\n\n\nResultModel: ", ResultModel.model_validate_json(result_json))
         return ResultModel.model_validate_json(result_json)
@@ -486,8 +506,6 @@ class SQLSchemaRetriever():
         return self.pgvector_store.as_retriever(similarity_top_k=3, timeout=15).retrieve(query)
 
 
-    
-
 
 # Class que executa as querys no banco
 class SQLRunQuery():
@@ -537,27 +555,42 @@ class TextToSQLWorkflow(Workflow):
         self, ctx: Context, ev: schemas.TableRetrieveEvent
     ) -> schemas.TextToSQLEvent | StopEvent:
         """Generate SQL statement."""
-        # print("--------- generate_sql step test")
-        if self.prompt_type == "text_to_sql":
-            kwargs = {
-                "context": ev.table_context_str,
-                "query": ev.query,
-            }
-            response_event = self.sql_generator.generate(kwargs)
-            # sql = self._parse_response_to_sql(chat_response)
-            # print(" ---------------- generate_sql return:", schemas.TextToSQLEvent(sql=chat_response.sql_query, query=chat_response.natural_language_query))
-            return response_event
-        else:
-            kwargs = {
-                "context": ev.table_context_str,
-                "query": ev.query,
-            }
-            chat_response = self.sql_generator.generate(kwargs)
-            # sql = self._parse_response_to_sql(chat_response)
+        kwargs = {
+            "context": ev.table_context_str,
+            "query": ev.query,
+        }
+        match self.prompt_type:
+            case "text_to_sql":
+                response_event = self.sql_generator.generate(kwargs)
+                return response_event
+
+            case "optimize_sql":
+                chat_response = self.sql_generator.generate(kwargs)
+                response = schemas.SynthesisResult(
+                    natural_language_response=chat_response.optimization_explanation,
+                    sql_query=chat_response.optimized_query
+                )
+                return StopEvent(result=response)
             
-            # result = schemas.TextToSQLEvent(sql=sql, query=ev.query)
-            # print(" ---------------- generate_sql result:", result)
-            return StopEvent(result=chat_response)
+            case "explain_sql":
+                chat_response = self.sql_generator.generate(kwargs)
+                response = schemas.SynthesisResult(
+                    natural_language_response=chat_response.sql_query_explanation,
+                    sql_query=""
+                )
+                return StopEvent(result=response)
+            
+            case "fix_sql":
+                chat_response = self.sql_generator.generate(kwargs)
+                response = schemas.SynthesisResult(
+                    natural_language_response=chat_response.fix_explanation,
+                    sql_query=chat_response.fixed_sql_query
+                )
+                return StopEvent(result=response)
+
+            case _:
+                raise ValueError(f"Unknown prompt_type: {self.prompt_type}")
+
 
     
     @step
