@@ -25,7 +25,6 @@ class TextToSQLEvent(Event):
     """Text-to-SQL event."""
     sql_query: str
     natural_language_query: str
-
 class SynthesisResult(Event):
     sql_query: str
     natural_language_response: str
@@ -54,3 +53,9 @@ class DatabaseConnection(BaseModel):
 
     class Config:
         from_attributes = True
+
+class SchemaSummary(BaseModel):
+    """Schema Summary"""
+    schema_summary: str
+
+

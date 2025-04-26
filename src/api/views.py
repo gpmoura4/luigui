@@ -254,7 +254,13 @@ class TableDetail(APIView):
             retriever.delete_table_schema(table.name)
         elif db_obj.type == "minimal":
             # Para o modo minimal, utiliza o SQLSchemaRetriever
-            retriever = SQLSchemaRetriever(db_obj.name)
+
+            llm=LLMFactory.create_llm("gpt-4o")
+            sql_generator = OpenAISQLGenerator(
+                llm=llm,
+                prompt_strategy=SchemaSummaryPromptStrategy("postgresql")
+            )
+            retriever = SQLSchemaRetriever(db_obj.name, sql_generator)
             retriever.delete_table_schema(table.name)
         else:
             return Response({"ERROR": "Invalid database type."}, status=status.HTTP_400_BAD_REQUEST)

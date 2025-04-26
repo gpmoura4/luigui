@@ -84,6 +84,29 @@ class TextToSQLPromptStrategy(IPromptStrategy):
 
     def function_schema(self) -> dict:
         return schemas.TextToSQLEvent.model_json_schema()
+    
+class SchemaSummaryPromptStrategy(IPromptStrategy):
+    def __init__(self, database):
+        self.database = database
+
+    def create_prompt(self, kwargs: Any) -> str:
+        schema_summary_prompt = (
+            "Give me a summary of the table about the following table schema. \n"
+            "Schema Information:\n{context}\n"
+            "Answer: \n"
+        )
+        return PromptTemplate(
+            schema_summary_prompt,
+        ).format_messages(
+            context=kwargs["context"],
+        )
+    
+
+    # def function_name(self) -> str:
+    #     return "text_to_sql"
+
+    # def function_schema(self) -> dict:
+    #     return schemas.TextToSQLEvent.model_json_schema()
 
 
 
@@ -215,6 +238,9 @@ class PromptStrategyFactory:
     @staticmethod
     def create_fixsql_strategy(database) -> IPromptStrategy:
         return FixSQLQueryPromptStrategy(database)
+    @staticmethod
+    def create_schema_summary_strategy(database) -> IPromptStrategy:
+        return SchemaSummaryPromptStrategy(database)
 
 
 class OpenAISQLGenerator:
@@ -259,6 +285,26 @@ class OpenAISQLGenerator:
         }[self.prompt_strategy.function_name()]
         print("\n\n\nResultModel: ", ResultModel.model_validate_json(result_json))
         return ResultModel.model_validate_json(result_json)
+    
+    def generate_schema_summary(self, kwargs) -> BaseModel:
+
+        user_message = {
+            "role": "user",
+            "content": str(self.prompt_strategy.create_prompt(kwargs))
+        }
+
+        response = self.llm.chat.completions.parse(
+        model="gpt-4o-2024-08-06",
+        messages=[user_message],
+        response_format=schemas.SchemaSummary,
+        )
+
+        print("================================\n")
+        print(response.choices[0].message)
+        print("Tipo: ", type(response.choices[0].message))
+        print("================================\n")
+        
+        return response.choices[0].message
 
 
 class LLMFactory:
@@ -405,9 +451,9 @@ class SQLTableRetriever():
 
     
 class SQLSchemaRetriever():
-    def __init__(self, db_name: str):
+    def __init__(self, db_name: str, sql_generator: OpenAISQLGenerator):
         self.db_name = db_name
-
+        self.sql_generator = sql_generator
         # Nesse caso, com execção do nome do database, o resto dos campos não é obrigatório
         self.pgvector_store = PGVectorStore.from_params(
             database=settings.env('DB_NAME'),
@@ -452,12 +498,21 @@ class SQLSchemaRetriever():
 
     def add_table_schema(self, table_name, table_schema):
         # Criar um nó de texto com o schema fornecido
+        # Levar o table_schema pro LLM produzir um summary
+
+        kwargs = {
+            "context": table_schema
+        }
+        
+        schema_summary_result = self.sql_generator.generate_schema_summary(kwargs)
+    
         node = TextNode(
             text=table_schema,
             metadata={
                 "table_name": table_name,
                 "type": "schema_definition"
-            }
+            },
+            schema_summary=schema_summary_result
         )
         
         # Criar ou carregar o índice existente
