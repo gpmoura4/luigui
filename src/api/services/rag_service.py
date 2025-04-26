@@ -60,12 +60,10 @@ class IPromptStrategy(Protocol):
         """Interface para estratégias de prompt"""
         pass
 
-    @abstractmethod
     def function_name(self) -> str:
         """Nome da função para function-calling."""
         pass
 
-    @abstractmethod
     def function_schema(self) -> dict:
         """JSON Schema dos parâmetros de saída."""
         pass
@@ -91,7 +89,7 @@ class SchemaSummaryPromptStrategy(IPromptStrategy):
 
     def create_prompt(self, kwargs: Any) -> str:
         schema_summary_prompt = (
-            "Give me a summary of the table about the following table schema. \n"
+            "Give me a short, concise summary/caption of the table in the following table schema. \n"
             "Schema Information:\n{context}\n"
             "Answer: \n"
         )
@@ -101,14 +99,6 @@ class SchemaSummaryPromptStrategy(IPromptStrategy):
             context=kwargs["context"],
         )
     
-
-    # def function_name(self) -> str:
-    #     return "text_to_sql"
-
-    # def function_schema(self) -> dict:
-    #     return schemas.TextToSQLEvent.model_json_schema()
-
-
 
 class OptimizesSQLQueryPromptStrategy(IPromptStrategy):
     def __init__(self, database):
@@ -276,15 +266,15 @@ class OpenAISQLGenerator:
         # 4. Extrai o JSON retornado e valida com Pydantic
         func_call = response.choices[0].message.function_call
         result_json = func_call.arguments
-        ResultModel = {
+        result_model = {
             "text_to_sql": schemas.TextToSQLEvent,
             "synthesize_response": schemas.SynthesisResult,
             "optimize_sql": schemas.OptimizeResult,
             "explain_sql": schemas.ExplainSQLResult,
             "fix_sql": schemas.FixSQLResult,
         }[self.prompt_strategy.function_name()]
-        print("\n\n\nResultModel: ", ResultModel.model_validate_json(result_json))
-        return ResultModel.model_validate_json(result_json)
+        print("\n\n\nResultModel: ", result_model.model_validate_json(result_json))
+        return result_model.model_validate_json(result_json)
     
     def generate_schema_summary(self, kwargs) -> BaseModel:
 
@@ -293,7 +283,7 @@ class OpenAISQLGenerator:
             "content": str(self.prompt_strategy.create_prompt(kwargs))
         }
 
-        response = self.llm.chat.completions.parse(
+        response = self.llm.beta.chat.completions.parse(
         model="gpt-4o-2024-08-06",
         messages=[user_message],
         response_format=schemas.SchemaSummary,
@@ -304,7 +294,8 @@ class OpenAISQLGenerator:
         print("Tipo: ", type(response.choices[0].message))
         print("================================\n")
         
-        return response.choices[0].message
+        return schemas.SchemaSummary.model_validate_json(response.choices[0].message.content)
+
 
 
 class LLMFactory:
@@ -510,9 +501,10 @@ class SQLSchemaRetriever():
             text=table_schema,
             metadata={
                 "table_name": table_name,
-                "type": "schema_definition"
+                "type": "schema_definition",
+                "schema_summary": schema_summary_result.schema_summary
             },
-            schema_summary=schema_summary_result
+            schema_summary=schema_summary_result.schema_summary
         )
         
         # Criar ou carregar o índice existente
