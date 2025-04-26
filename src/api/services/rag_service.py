@@ -638,13 +638,15 @@ class SimpleTextToSQLWorkflow(Workflow):
         self,
         schema_retriever: SQLSchemaRetriever,    
         sql_generator: OpenAISQLGenerator,
+        prompt_type: str,
         *args,
         **kwargs,
     ) -> None:
         """Init params."""
-        super().__init__(*args, **kwargs, timeout=30)
+        super().__init__(*args, **kwargs, timeout=300)
         self.schema_retriever = schema_retriever
         self.sql_generator = sql_generator
+        self.prompt_type = prompt_type
     
     @step
     def retrieve_tables(
@@ -671,15 +673,38 @@ class SimpleTextToSQLWorkflow(Workflow):
             "context": ev.table_schema,
             "query": ev.query,
         }
-        print("--------- generate_sql step test 1")
-        chat_response = self.sql_generator.generate(kwargs)
-        print("--------- generate_sql step test 1")
-        sql = self._parse_response_to_sql(chat_response)
-        print(" ---------------- generate_sql return:", schemas.TextToSQLEvent(sql=sql, query=ev.query))
-        
-        result = schemas.TextToSQLEvent(sql=sql, query=ev.query)
-        print(" ---------------- generate_sql result:", result)
-        return StopEvent(result=result)
+
+        match self.prompt_type:
+            case "text_to_sql":
+                response_event = self.sql_generator.generate(kwargs)
+                return response_event
+
+            case "optimize_sql":
+                chat_response = self.sql_generator.generate(kwargs)
+                response = schemas.SynthesisResult(
+                    natural_language_response=chat_response.optimization_explanation,
+                    sql_query=chat_response.optimized_query
+                )
+                return StopEvent(result=response)
+            
+            case "explain_sql":
+                chat_response = self.sql_generator.generate(kwargs)
+                response = schemas.SynthesisResult(
+                    natural_language_response=chat_response.sql_query_explanation,
+                    sql_query=""
+                )
+                return StopEvent(result=response)
+            
+            case "fix_sql":
+                chat_response = self.sql_generator.generate(kwargs)
+                response = schemas.SynthesisResult(
+                    natural_language_response=chat_response.fix_explanation,
+                    sql_query=chat_response.fixed_sql_query
+                )
+                return StopEvent(result=response)
+
+            case _:
+                raise ValueError(f"Unknown prompt_type: {self.prompt_type}")
     
 
     def _get_table_context_str(self, table_schema_objs: List[SQLTableSchema]) -> str:
@@ -793,6 +818,7 @@ async def starts_simple_workflow(
     txt_tosql_workflow = SimpleTextToSQLWorkflow(
         schema_retriever=schema_retriever,
         sql_generator=sql_generator,
+        prompt_type=prompt_type
     )
 
     print("txt_tosql_workflow", txt_tosql_workflow)
