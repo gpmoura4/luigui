@@ -78,6 +78,7 @@ class QuestionAnswerSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuestionAnswer
         fields = ["database", "question", "answer", "query", "prompt_type"]
+        # Campos opcionais a depender do tipo de Database e prompt_type
         extra_kwargs = {
             "answer": {"read_only": True},
             "query": {"read_only": True},

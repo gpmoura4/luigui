@@ -23,8 +23,8 @@ class SchemaRetrieveEvent(Event):
 
 class TextToSQLEvent(Event):
     """Text-to-SQL event."""
-    natural_language_query: str
     sql_query: str
+    natural_language_query: str
 
 class SynthesisResult(Event):
     sql_query: str

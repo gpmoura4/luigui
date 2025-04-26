@@ -121,15 +121,15 @@ class ExplainSQLQueryPromptStrategy(IPromptStrategy):
         self.database=database
     
     def create_prompt(self, kwargs: Any) -> str:
-        optimize_sql_query_prompt = (
-            "Explain in detail what this SQL query does, including any potential performance implications or areas for improvement: \n"
+        explain_sql_query_prompt = (
+            "Explain this SQL query in detail; do not return the provided query, but only an explanation of what it does. \n"
             "Schema Information:\n{context}\n"
             "Database: {database}\n" 
             "Query: {query}\n"
             "Explanation: \n"
         )
         return PromptTemplate(
-            optimize_sql_query_prompt,
+            explain_sql_query_prompt,
         ).format_messages(
             query=kwargs["query"],
             context=kwargs["context"],
@@ -676,8 +676,12 @@ class SimpleTextToSQLWorkflow(Workflow):
 
         match self.prompt_type:
             case "text_to_sql":
-                response_event = self.sql_generator.generate(kwargs)
-                return response_event
+                chat_response = self.sql_generator.generate(kwargs)
+                response = schemas.SynthesisResult(
+                    natural_language_response="",
+                    sql_query=chat_response.sql_query
+                )
+                return StopEvent(result=response)
 
             case "optimize_sql":
                 chat_response = self.sql_generator.generate(kwargs)
@@ -828,7 +832,7 @@ async def starts_simple_workflow(
         timeout=30
         )
 
-    print("\n\nResponse: ", response.sql)
+    print("\n\nResponse: ", response.sql_query)
     print("\n\n")
 
     return response
