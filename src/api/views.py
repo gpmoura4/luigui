@@ -89,42 +89,94 @@ class DatabaseDetail(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class TableList(APIView):    
+class TableList(APIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerTable]
+
     def post(self, request, database, format=None):
+        # Busca o objeto Database e converte para dict
         try:
             db_obj = Database.objects.get(id=database)
             database_dict = model_to_dict(db_obj)
-        except:
-            return Response({"ERROR": "Database not found."}, status=status.HTTP_404_NOT_FOUND)    
+        except Database.DoesNotExist:
+            return Response({"ERROR": "Database not found."}, status=status.HTTP_404_NOT_FOUND)
+        
         data = request.data
-
-        try: 
-            db_password = data["db_password"]
-        except:
-            return Response({"ERROR": "db_password password not provided."}, status=status.HTTP_400_BAD_REQUEST)     
-        table_name = data.get("name")
-        if db_obj.table_set.filter(name=table_name).exists():
-            return Response({"ERROR": "Table with this name already exists."}, status=status.HTTP_400_BAD_REQUEST)
-
-        data["database"] = database_dict["id"]
-        data.pop("db_password", None)
-        table_serializer = TableSerializer(data=data)
-        if table_serializer.is_valid(): 
-            if db_obj.check_password(db_password):
-                database_dict["password"] = db_password
-                connection_string = schemas.DatabaseConnection(**database_dict)    
-                tables = [table.name for table in db_obj.table_set.all()]
-                retriever = SQLTableRetriever(cnt_str=connection_string, tables=tables, have_obj_index=db_obj.have_obj_index)
-                retriever.add_table_schema(table_serializer.validated_data["name"])
-                table_serializer.save() 
-                if not db_obj.have_obj_index:
-                    db_obj.have_obj_index = True
-                    db_obj.save()
-
-            return Response(table_serializer.data, status=status.HTTP_201_CREATED)
-        return Response(table_serializer.errors, status=status.HTTP_400_BAD_REQUEST)   
-
+        
+        # Caso o database seja do tipo "complete"
+        if db_obj.type == "complete":
+            try:
+                db_password = data["db_password"]
+            except KeyError:
+                return Response({"ERROR": "db_password not provided."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            table_name = data.get("name")
+            if db_obj.table_set.filter(name=table_name).exists():
+                return Response({"ERROR": "Table with this name already exists."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Prepara os dados para o serializer e remove o campo de senha do payload
+            data["database"] = database_dict["id"]
+            data.pop("db_password", None)
+            table_serializer = TableSerializer(data=data)
+            
+            if table_serializer.is_valid():
+                if db_obj.check_password(db_password):
+                    database_dict["password"] = db_password
+                    connection_string = schemas.DatabaseConnection(**database_dict)
+                    tables = [table.name for table in db_obj.table_set.all()]
+                    retriever = SQLTableRetriever(
+                        cnt_str=connection_string,
+                        tables=tables,
+                        have_obj_index=db_obj.have_obj_index
+                    )
+                    # Adiciona o schema da nova tabela ao índice do PGVector
+                    retriever.add_table_schema(table_serializer.validated_data["name"])
+                    
+                    table_serializer.save()
+                    
+                    # Se ainda não tiver o índice salvo, atualiza o flag
+                    if not db_obj.have_obj_index:
+                        db_obj.have_obj_index = True
+                        db_obj.save()
+                    
+                    return Response(table_serializer.data, status=status.HTTP_201_CREATED)
+            
+            return Response(table_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Caso o database seja do tipo "minimal"
+        if db_obj.type == "minimal":
+            try:
+                only_schemas = data["schemas"]
+            except KeyError:
+                return Response({"ERROR": "schemas not provided."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Gera a lista de schemas a partir do JSON enviado
+            only_schemas_formatted = generate_postgres_schemas(only_schemas)
+            
+            results = []
+            # Instancia o retriever apenas uma vez para o database em questão
+            retriever_schema = SQLSchemaRetriever(database_dict["name"])
+            
+            for value in only_schemas_formatted:
+                table_data = {
+                    "database": database_dict["id"],
+                    "name": value['table_name']
+                }
+                table_serializer = TableSerializer(data=table_data)
+                
+                if table_serializer.is_valid():
+                    # Salva o registro e adiciona o schema ao PGVector
+                    table_serializer.save()
+                    retriever_schema.add_table_schema(value['table_name'], value['schema'])
+                    results.append(table_serializer.data)
+                else:
+                    # Caso ocorra erro de validação, adiciona os erros ao resultado
+                    results.append({"errors": table_serializer.errors})
+            
+            return Response(results, status=status.HTTP_201_CREATED)
+        
+        return Response({"ERROR": "Invalid database type."}, status=status.HTTP_400_BAD_REQUEST)
+ 
+        
     
     def get(self, request, database, format=None):
         if request.user.is_authenticated:        
@@ -183,7 +235,7 @@ class TableDetail(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, database, pk, format=None):
-        # Primeiro, verifica se o database existe
+        # Verifica se o database existe
         try:
             db_obj = Database.objects.get(id=database)
         except Database.DoesNotExist:
@@ -192,66 +244,25 @@ class TableDetail(APIView):
         # Recupera a tabela com a verificação de permissão
         table = self.get_object(database, pk)
         
-        # Prepara a conexão para manipulação do schema da tabela
-        database_dict = model_to_dict(db_obj)
-        connection_string = schemas.DatabaseConnection(**database_dict)
-        tables = [table_obj.name for table_obj in db_obj.table_set.all()]
-        retriever = SQLTableRetriever(cnt_str=connection_string, tables=tables, have_obj_index=db_obj.have_obj_index)
+        # Para manipular o schema, preparamos a conexão ou instanciamos o retriever conforme o tipo
+        if db_obj.type == "complete":
+            # Para conexões completas, utiliza o SQLTableRetriever (supondo que ele tenha o método delete_table_schema)
+            database_dict = model_to_dict(db_obj)
+            connection_string = schemas.DatabaseConnection(**database_dict)
+            tables = [table_obj.name for table_obj in db_obj.table_set.all()]
+            retriever = SQLTableRetriever(cnt_str=connection_string, tables=tables, have_obj_index=db_obj.have_obj_index)
+            retriever.delete_table_schema(table.name)
+        elif db_obj.type == "minimal":
+            # Para o modo minimal, utiliza o SQLSchemaRetriever
+            retriever = SQLSchemaRetriever(db_obj.name)
+            retriever.delete_table_schema(table.name)
+        else:
+            return Response({"ERROR": "Invalid database type."}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Remove a definição do schema e deleta a tabela
-        retriever.delete_table_schema(table.name)
+        # Remove o registro da tabela do banco de dados
         table.delete()
         
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-# class TableDetail(APIView):
-#     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerTable]
-#     def put(self, request, database, pk,  format=None):
-#         try: 
-#             db_obj = Database.objects.get(id=database)
-#         except:
-#             return Response({"ERROR":"Database not found"}, status=status.HTTP_404_NOT_FOUND)    
-#         data = request.data 
-#         data["database"] = db_obj.id
-        
-#         table = self.get_object(pk)
-#         serializer = TableSerializer(table, data=data)
-#         if serializer.is_valid():
-#             serializer.save()
-#             return Response(serializer.data)
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
- 
-#     def delete(self, request, database, pk, format=None):
-#         try:
-#             db_obj = Database.objects.get(id=database)
-#             database_dict = model_to_dict(db_obj)
-#         except:
-#             return Response({"ERROR": "Database not found"}, status=status.HTTP_404_NOT_FOUND)    
-        
-#         connection_string = schemas.DatabaseConnection(**database_dict)    
-#         tables = [table.name for table in db_obj.table_set.all()]
-#         retriever = SQLTableRetriever(cnt_str=connection_string, tables=tables, have_obj_index=db_obj.have_obj_index)
-#         table = self.get_object(pk)
-#         print("-------- DELETE FUNCTION -------")
-#         print("table: ", table)
-#         print("table.name: ", table.name)
-#         retriever.delete_table_schema(table.name)
-#         table.delete()
-
-#         return Response(status=status.HTTP_204_NO_CONTENT)
-    
-#     def get_object(self, database_id, pk):
-#         try:
-#             # Garante que a tabela pertence ao database especificado
-#             return Table.objects.get(pk=pk, database__id=database_id)
-#         except Table.DoesNotExist:
-#             raise Http404
-        
-#     def get(self, request, database, pk, format=None):
-#         table = self.get_object(pk)
-#         serializer = TableSerializer(table)
-#         return Response(serializer.data)
 
 
 class QuestionAnswerList(APIView):    
@@ -264,40 +275,66 @@ class QuestionAnswerList(APIView):
         except:
             return Response({"ERROR":"Database not found"}, status=status.HTTP_404_NOT_FOUND)    
         data = request.data 
-        try: 
-            print("question answer try db_password")
-            db_password = data["db_password"]    
-        except:
-            return Response({"ERROR": "db_password password not provided"}, status=status.HTTP_400_BAD_REQUEST)     
+ 
+        if db_obj.type == "complete":
+            try: 
+                print("question answer try db_password")
+                db_password = data["db_password"]    
+            except:
+                return Response({"ERROR": "db_password password not provided"}, status=status.HTTP_400_BAD_REQUEST)     
+    
+            data["database"] = db_obj.id
+            data.pop("db_password", None)
+            serializer = QuestionAnswerSerializer(data=data)
+            print("--------- view question linha 0")                
+            if serializer.is_valid():            
+                print("--------- view question linha 1")                
+                if db_obj.check_password(db_password):
+                    database_dict["password"] = db_password
+                    connection_string = schemas.DatabaseConnection(**database_dict)    
+                    tables = [table.name for table in db_obj.table_set.all()]
 
-        
-        data["database"] = db_obj.id
-        # data["user_id"] = 5
-        data.pop("db_password", None)
-        serializer = QuestionAnswerSerializer(data=data)
-        print("--------- view question linha 0")                
-        if serializer.is_valid():            
-            print("--------- view question linha 1")                
-            if db_obj.check_password(db_password):
-                database_dict["password"] = db_password
-                connection_string = schemas.DatabaseConnection(**database_dict)    
-                tables = [table.name for table in db_obj.table_set.all()]
-
-                print("--------- view question linha 2")                
+                    print("--------- view question linha 2")                
+                    
+                    response = asyncio.run(starts_workflow(
+                        cnt_str=connection_string, 
+                        tables=tables, 
+                        user_question=data["question"],
+                        have_obj_index=db_obj.have_obj_index,
+                        prompt_type=data["prompt_type"]
+                    ))
+                    print("VIEW response", response)
+                    print("--------- view question linha 3")
+                    if data["prompt_type"] == "text_to_sql":
+                        serializer.validated_data["answer"] = response.natural_language_response
+                        serializer.validated_data["query"] = response.sql_query
+                    else:
+                        serializer.validated_data["answer"] = response.natural_language_response
+                        serializer.validated_data["query"] = response.sql_query
+                    serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)    
+        if db_obj.type == "minimal":
+            data["database"] = db_obj.id
+            
+            serializer = QuestionAnswerSerializer(data=data)
+            print("--------- view question linha 0")                
+            if serializer.is_valid():            
+                print("--------- view question linha 1")                
                 
-                response = asyncio.run(starts_workflow(
-                    cnt_str=connection_string, 
-                    tables=tables, 
+                response = asyncio.run(starts_simple_workflow(     
                     user_question=data["question"],
-                    have_obj_index=db_obj.have_obj_index
+                    db_name=db_obj.name,
+                    prompt_type=data["prompt_type"]
                 ))
-                print("VIEW response", response)
+                # print("VIEW response", response)
                 print("--------- view question linha 3")
-                serializer.validated_data["answer"] = response.response
+                serializer.validated_data["answer"] = response.natural_language_response
                 serializer.validated_data["query"] = response.sql_query
                 serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)    
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)    
+
 
     def get(self, request, database, format=None):
         # Buscar o id do db atual e listar todas as tabelas desse id

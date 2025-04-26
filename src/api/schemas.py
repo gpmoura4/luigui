@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from typing import Optional
 from llama_index.core.workflow import Event
 
 
@@ -14,15 +15,34 @@ class TableRetrieveEvent(Event):
     table_context_str: str
     query: str
 
+class SchemaRetrieveEvent(Event):
+    """Result of running schema retrieval."""
+    table_schema: str
+    query: str
+
 
 class TextToSQLEvent(Event):
     """Text-to-SQL event."""
-    sql: str
-    query: str
-
-class WorkFlowResult(Event):
     sql_query: str
-    response: str
+    natural_language_query: str
+
+class SynthesisResult(Event):
+    sql_query: str
+    natural_language_response: str
+
+class OptimizeResult(Event):
+    """Result of running optimization."""
+    optimized_query: str
+    optimization_explanation: str
+
+class ExplainSQLResult(Event):
+    """Result of running optimization."""
+    sql_query_explanation: str
+
+class FixSQLResult(Event):
+    """Result of fixing a query."""
+    fixed_sql_query: str
+    fix_explanation: str
 
 class DatabaseConnection(BaseModel):
     """Database connection information."""
