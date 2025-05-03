@@ -247,7 +247,7 @@ class OpenAISQLGenerator:
             "role": "user",
             "content": str(self.prompt_strategy.create_prompt(kwargs))
         }
-
+        print("\n\n\nPROMPT: \n", str(self.prompt_strategy.create_prompt(kwargs)))
         # 2. Função “simulada” para structured output
         func_def = {
             "name": self.prompt_strategy.function_name(),
@@ -702,12 +702,13 @@ class SimpleTextToSQLWorkflow(Workflow):
         """Retrieve tables."""
     
         retrieved_schemas = self.schema_retriever.retrieve(ev.query)
+        print("\n\nretrieved_schemas: ", retrieved_schemas)
 
-        table_schema = "\n\n".join(schema.text for schema in retrieved_schemas)
-
+        # table_schema = "\n\n".join(schema.text for schema in retrieved_schemas)
+        tables_schemas = self._get_table_context_str(retrieved_schemas)
         # Retornando o schema e a pergunta do usuário
         return schemas.SchemaRetrieveEvent(
-            table_schema=table_schema, query=ev.query
+            table_schema=tables_schemas, query=ev.query
         )
     
     @step
@@ -761,19 +762,16 @@ class SimpleTextToSQLWorkflow(Workflow):
     def _get_table_context_str(self, table_schema_objs: List[SQLTableSchema]) -> str:
         """Get table context string."""
         # print("--------- _get_table_context_str step test")
-        context_strs = []
+        context_strs = ""
         for table_schema_obj in table_schema_objs:
-            table_info = self.sql_database.get_single_table_info(
-                table_schema_obj.table_name
-            )
-            if table_schema_obj.context_str:
-                table_opt_context = " The table description is: "
-                table_opt_context += table_schema_obj.context_str
+            table_info = table_schema_obj.text
+            if table_schema_obj.metadata:
+                table_opt_context = "\nThe table description is: "
+                table_opt_context += table_schema_obj.metadata["schema_summary"]
                 table_info += table_opt_context
-
-            context_strs.append(table_info)
-            print(" ---------------- _get_table_context_str return:", "\n\n".join(context_strs))
-        return "\n\n".join(context_strs)
+                table_info += "\n\n"
+            context_strs += table_info
+        return context_strs
     
 
 async def starts_workflow(
@@ -840,16 +838,6 @@ async def starts_simple_workflow(
         prompt_type: str, 
         ) -> schemas.SynthesisResult:
 
-    schema_retriever = SQLSchemaRetriever(
-        db_name=db_name
-    )
-
-    print("schema_retriever", schema_retriever)
-
-    
-
-    llm = LLMFactory.create_llm("gpt-4o")
-    
     if prompt_type == "text_to_sql":
         prompt_strategy=TextToSQLPromptStrategy("postgresql")
     if prompt_type == "optimize_sql":
@@ -859,12 +847,18 @@ async def starts_simple_workflow(
     if prompt_type == "fix_sql":
         prompt_strategy=FixSQLQueryPromptStrategy("postgresql")
 
+    llm = LLMFactory.create_llm("gpt-4o")
     sql_generator = OpenAISQLGenerator(
         llm=llm,
         prompt_strategy=prompt_strategy
     )
 
-    print("sql_generator", sql_generator)
+    schema_retriever = SQLSchemaRetriever(
+        db_name=db_name,
+        sql_generator=sql_generator
+    )
+
+    print("schema_retriever", schema_retriever)
 
     txt_tosql_workflow = SimpleTextToSQLWorkflow(
         schema_retriever=schema_retriever,
