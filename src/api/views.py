@@ -102,7 +102,6 @@ class TableList(APIView):
         
         data = request.data
         
-        # Caso o database seja do tipo "complete"
         if db_obj.type == "complete":
             try:
                 db_password = data["db_password"]
@@ -123,8 +122,14 @@ class TableList(APIView):
                     database_dict["password"] = db_password
                     connection_string = schemas.DatabaseConnection(**database_dict)
                     tables = [table.name for table in db_obj.table_set.all()]
+                    llm = LLMFactory.create_llm("gpt-4o")
+                    sql_generator = OpenAISQLGenerator(
+                        llm=llm,
+                        prompt_strategy=SchemaSummaryPromptStrategy("postgresql")
+                    )
                     retriever = SQLTableRetriever(
                         cnt_str=connection_string,
+                        sql_generator=sql_generator,
                         tables=tables,
                         have_obj_index=db_obj.have_obj_index
                     )
@@ -142,19 +147,21 @@ class TableList(APIView):
             
             return Response(table_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
-        # Caso o database seja do tipo "minimal"
         if db_obj.type == "minimal":
             try:
                 only_schemas = data["schemas"]
             except KeyError:
                 return Response({"ERROR": "schemas not provided."}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Gera a lista de schemas a partir do JSON enviado
             only_schemas_formatted = generate_postgres_schemas(only_schemas)
             
             results = []
-            # Instancia o retriever apenas uma vez para o database em questão
-            retriever_schema = SQLSchemaRetriever(database_dict["name"])
+            llm = LLMFactory.create_llm("gpt-4o")
+            sql_generator = OpenAISQLGenerator(
+                llm=llm,
+                prompt_strategy=SchemaSummaryPromptStrategy("postgresql")
+            )
+            retriever_schema = SQLSchemaRetriever(database_dict["name"], sql_generator)
             
             for value in only_schemas_formatted:
                 table_data = {
@@ -165,8 +172,8 @@ class TableList(APIView):
                 
                 if table_serializer.is_valid():
                     # Salva o registro e adiciona o schema ao PGVector
-                    table_serializer.save()
                     retriever_schema.add_table_schema(value['table_name'], value['schema'])
+                    table_serializer.save()
                     results.append(table_serializer.data)
                 else:
                     # Caso ocorra erro de validação, adiciona os erros ao resultado
@@ -243,18 +250,27 @@ class TableDetail(APIView):
         
         # Recupera a tabela com a verificação de permissão
         table = self.get_object(database, pk)
-        
+        llm=LLMFactory.create_llm("gpt-4o")
+        sql_generator = OpenAISQLGenerator(
+            llm=llm,
+            prompt_strategy=SchemaSummaryPromptStrategy("postgresql")
+        )
         # Para manipular o schema, preparamos a conexão ou instanciamos o retriever conforme o tipo
         if db_obj.type == "complete":
             # Para conexões completas, utiliza o SQLTableRetriever (supondo que ele tenha o método delete_table_schema)
             database_dict = model_to_dict(db_obj)
             connection_string = schemas.DatabaseConnection(**database_dict)
             tables = [table_obj.name for table_obj in db_obj.table_set.all()]
-            retriever = SQLTableRetriever(cnt_str=connection_string, tables=tables, have_obj_index=db_obj.have_obj_index)
+            retriever = SQLTableRetriever(
+                cnt_str=connection_string, 
+                sql_generator=sql_generator, 
+                tables=tables, 
+                have_obj_index=db_obj.have_obj_index
+            )                                
             retriever.delete_table_schema(table.name)
         elif db_obj.type == "minimal":
             # Para o modo minimal, utiliza o SQLSchemaRetriever
-            retriever = SQLSchemaRetriever(db_obj.name)
+            retriever = SQLSchemaRetriever(db_obj.name, sql_generator)
             retriever.delete_table_schema(table.name)
         else:
             return Response({"ERROR": "Invalid database type."}, status=status.HTTP_400_BAD_REQUEST)

@@ -5,15 +5,15 @@ from llama_index.core.workflow import Event
 
 class TableInfo(BaseModel):
     """Information regarding a structured table."""
-    table_name: str = Field(
-        ..., description="table name (must be underscores and NO spaces)"
-    )
+    table_name: str 
+    table_context: Optional[str] = None
 
 
 class TableRetrieveEvent(Event):
     """Result of running table retrieval."""
     table_context_str: str
     query: str
+
 
 class SchemaRetrieveEvent(Event):
     """Result of running schema retrieval."""
@@ -26,23 +26,28 @@ class TextToSQLEvent(Event):
     sql_query: str
     natural_language_query: str
 
+
 class SynthesisResult(Event):
     sql_query: str
     natural_language_response: str
+
 
 class OptimizeResult(Event):
     """Result of running optimization."""
     optimized_query: str
     optimization_explanation: str
 
+
 class ExplainSQLResult(Event):
     """Result of running optimization."""
     sql_query_explanation: str
+
 
 class FixSQLResult(Event):
     """Result of fixing a query."""
     fixed_sql_query: str
     fix_explanation: str
+
 
 class DatabaseConnection(BaseModel):
     """Database connection information."""
@@ -52,5 +57,11 @@ class DatabaseConnection(BaseModel):
     password: str
     name: str
 
+
     class Config:
         from_attributes = True
+
+
+class SchemaSummary(BaseModel):
+    """Schema Summary"""
+    schema_summary: str

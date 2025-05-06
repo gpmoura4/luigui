@@ -60,12 +60,10 @@ class IPromptStrategy(Protocol):
         """Interface para estratégias de prompt"""
         pass
 
-    @abstractmethod
     def function_name(self) -> str:
         """Nome da função para function-calling."""
         pass
 
-    @abstractmethod
     def function_schema(self) -> dict:
         """JSON Schema dos parâmetros de saída."""
         pass
@@ -84,8 +82,23 @@ class TextToSQLPromptStrategy(IPromptStrategy):
 
     def function_schema(self) -> dict:
         return schemas.TextToSQLEvent.model_json_schema()
+    
+class SchemaSummaryPromptStrategy(IPromptStrategy):
+    def __init__(self, database):
+        self.database = database
 
-
+    def create_prompt(self, kwargs: Any) -> str:
+        schema_summary_prompt = (
+            "Give me a short, concise summary/caption of the table in the following table schema. \n"
+            "Schema Information:\n{context}\n"
+            "Answer: \n"
+        )
+        return PromptTemplate(
+            schema_summary_prompt,
+        ).format_messages(
+            context=kwargs["context"],
+        )
+    
 
 class OptimizesSQLQueryPromptStrategy(IPromptStrategy):
     def __init__(self, database):
@@ -215,6 +228,9 @@ class PromptStrategyFactory:
     @staticmethod
     def create_fixsql_strategy(database) -> IPromptStrategy:
         return FixSQLQueryPromptStrategy(database)
+    @staticmethod
+    def create_schema_summary_strategy(database) -> IPromptStrategy:
+        return SchemaSummaryPromptStrategy(database)
 
 
 class OpenAISQLGenerator:
@@ -231,7 +247,7 @@ class OpenAISQLGenerator:
             "role": "user",
             "content": str(self.prompt_strategy.create_prompt(kwargs))
         }
-
+        print("\n\n\nPROMPT: \n", str(self.prompt_strategy.create_prompt(kwargs)))
         # 2. Função “simulada” para structured output
         func_def = {
             "name": self.prompt_strategy.function_name(),
@@ -250,15 +266,35 @@ class OpenAISQLGenerator:
         # 4. Extrai o JSON retornado e valida com Pydantic
         func_call = response.choices[0].message.function_call
         result_json = func_call.arguments
-        ResultModel = {
+        result_model = {
             "text_to_sql": schemas.TextToSQLEvent,
             "synthesize_response": schemas.SynthesisResult,
             "optimize_sql": schemas.OptimizeResult,
             "explain_sql": schemas.ExplainSQLResult,
             "fix_sql": schemas.FixSQLResult,
         }[self.prompt_strategy.function_name()]
-        print("\n\n\nResultModel: ", ResultModel.model_validate_json(result_json))
-        return ResultModel.model_validate_json(result_json)
+        print("\n\n\nResultModel: ", result_model.model_validate_json(result_json))
+        return result_model.model_validate_json(result_json)
+    
+    def generate_schema_summary(self, kwargs) -> BaseModel:
+
+        user_message = {
+            "role": "user",
+            "content": str(self.prompt_strategy.create_prompt(kwargs))
+        }
+
+        response = self.llm.beta.chat.completions.parse(
+        model="gpt-4o-2024-08-06",
+        messages=[user_message],
+        response_format=schemas.SchemaSummary,
+        )
+
+        print("================================\n")
+        print(response.choices[0].message)
+        print("Tipo: ", type(response.choices[0].message))
+        print("================================\n")
+        
+        return schemas.SchemaSummary.model_validate_json(response.choices[0].message.content)
 
 
 class LLMFactory:
@@ -269,8 +305,9 @@ class LLMFactory:
 
 
 class SQLTableRetriever():
-    def __init__(self, cnt_str: schemas.DatabaseConnection, tables: List[str], have_obj_index: bool):
+    def __init__(self, cnt_str: schemas.DatabaseConnection, sql_generator: OpenAISQLGenerator, tables: List[str], have_obj_index: bool):
         self.cnt_str = cnt_str
+        self.sql_generator = sql_generator
         self.tables = tables
         self.have_obj_index = have_obj_index
         self.obj_index = None
@@ -291,22 +328,18 @@ class SQLTableRetriever():
 
     def adding_existing_index(self, new_table_name):
         """ADICIONANDO NOVA TABELA AO PGVECTOR NUM INDEX JÁ EXISTENTE"""
+        table_schema = self.sql_database.get_table_columns(new_table_name)
+        print("\n\n\ntable_schema: ", table_schema)
+        kwargs = {
+            "context": table_schema
+        }
+        
+        schema_summary_result = self.sql_generator.generate_schema_summary(kwargs)
         try:
-            tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
-            # print("\n\ntables_info schema load: ", tables_info)    
-            table_schema_objs = [
-                SQLTableSchema(table_name=t.table_name)
-                for t in tables_info
-            ]
             table_node_mapping = SQLTableNodeMapping(self.sql_database)
             index = VectorStoreIndex.from_vector_store(vector_store=self.pgvector_store)
-
-            obj_test = ObjectIndex.from_objects_and_index(objects=table_schema_objs, object_mapping=table_node_mapping, index=index)
-            
-            new_table_schema = SQLTableSchema(table_name=new_table_name)
-            
+            new_table_schema = SQLTableSchema(table_name=new_table_name, context_str=schema_summary_result.schema_summary)
             new_node = table_node_mapping.to_node(new_table_schema)
-        
             index.insert_nodes([new_node])
         except Exception as e:
             print(f"Erro ao carregar índice do PGVector: {e}")
@@ -326,16 +359,24 @@ class SQLTableRetriever():
             return ObjectIndex.from_objects_and_index(objects=table_schema_objs, object_mapping=table_node_mapping, index=index)
         except Exception as e:
             print(f"Erro ao carregar índice do PGVector: {e}")
-            self.obj_index = None  # Evita erro caso não haja índice salvo
+            self.obj_index = None 
 
     def add_table_schema(self, new_table_name):
+        table_schema = self.sql_database.get_table_columns(new_table_name)
+        print("\n\n\ntable_schema: ", table_schema)
+        kwargs = {
+            "context": table_schema
+        }
+        
+        schema_summary_result = self.sql_generator.generate_schema_summary(kwargs)
+        print("\n\n\nschema_summary_result: ", schema_summary_result)
         if not self.have_obj_index:
             table_node_mapping = SQLTableNodeMapping(self.sql_database)
-            tables_info = [schemas.TableInfo(table_name=new_table_name)]
+            tables_info = [schemas.TableInfo(table_name=new_table_name, table_context=schema_summary_result.schema_summary)]
             # tables_info = [schemas.TableInfo(table_name=table) for table in self.tables]
             # print("\n\ntables_info schema: ", tables_info)    
             table_schema_objs = [
-                SQLTableSchema(table_name=t.table_name)
+                SQLTableSchema(table_name=t.table_name, context_str=t.table_context)
                 for t in tables_info
             ]
             # print("\n\ntable_schema_objs: ", table_schema_objs)
@@ -347,21 +388,10 @@ class SQLTableRetriever():
             )
         if self.have_obj_index:    
             self.obj_index = self.adding_existing_index(new_table_name)
-            # print("self.obj_index: ", self.obj_index)
-            # Se for diferente de None
 
     def delete_table_schema(self, table_to_delete):
         # Clear no data_vector
-        self.pgvector_store.clear()
-
-        print("-------- delete_table_schema -------")
-
-        print("------------ Self.Tables --------------")
-        print(self.tables)
-
-        # Atualize a lista de tabelas removendo a que deve ser deletada
-        print("NAME table_to_delete: ", table_to_delete)
-        
+        self.pgvector_store.clear()    
         for table in self.tables:
             print("table names in self.tables: ", table)
             if table != table_to_delete:
@@ -405,9 +435,9 @@ class SQLTableRetriever():
 
     
 class SQLSchemaRetriever():
-    def __init__(self, db_name: str):
+    def __init__(self, db_name: str, sql_generator: OpenAISQLGenerator):
         self.db_name = db_name
-
+        self.sql_generator = sql_generator
         # Nesse caso, com execção do nome do database, o resto dos campos não é obrigatório
         self.pgvector_store = PGVectorStore.from_params(
             database=settings.env('DB_NAME'),
@@ -452,12 +482,22 @@ class SQLSchemaRetriever():
 
     def add_table_schema(self, table_name, table_schema):
         # Criar um nó de texto com o schema fornecido
+        # Levar o table_schema pro LLM produzir um summary
+
+        kwargs = {
+            "context": table_schema
+        }
+        
+        schema_summary_result = self.sql_generator.generate_schema_summary(kwargs)
+    
         node = TextNode(
             text=table_schema,
             metadata={
                 "table_name": table_name,
-                "type": "schema_definition"
-            }
+                "type": "schema_definition",
+                "schema_summary": schema_summary_result.schema_summary
+            },
+            schema_summary=schema_summary_result.schema_summary
         )
         
         # Criar ou carregar o índice existente
@@ -542,7 +582,7 @@ class TextToSQLWorkflow(Workflow):
         # print("--------- retrieve_tables step test")
         table_schema_objs = self.obj_retriever.retrieve(ev.query)
         table_context_str = self._get_table_context_str(table_schema_objs)
-
+        print("\n\n\n\n\ntable_context_str: ", table_context_str)
         print(" ---------------- retrieve_tables return:", schemas.TableRetrieveEvent(
             table_context_str=table_context_str, query=ev.query))
 
@@ -621,6 +661,7 @@ class TextToSQLWorkflow(Workflow):
             table_info = self.sql_database.get_single_table_info(
                 table_schema_obj.table_name
             )
+            print("\n\n\context_str: ", table_schema_obj.context_str)
             if table_schema_obj.context_str:
                 table_opt_context = " The table description is: "
                 table_opt_context += table_schema_obj.context_str
@@ -655,12 +696,11 @@ class SimpleTextToSQLWorkflow(Workflow):
         """Retrieve tables."""
     
         retrieved_schemas = self.schema_retriever.retrieve(ev.query)
-
-        table_schema = "\n\n".join(schema.text for schema in retrieved_schemas)
-
+        print("\n\nretrieved_schemas: ", retrieved_schemas)
+        tables_schemas = self._get_table_context_str(retrieved_schemas)
         # Retornando o schema e a pergunta do usuário
         return schemas.SchemaRetrieveEvent(
-            table_schema=table_schema, query=ev.query
+            table_schema=tables_schemas, query=ev.query
         )
     
     @step
@@ -713,20 +753,16 @@ class SimpleTextToSQLWorkflow(Workflow):
 
     def _get_table_context_str(self, table_schema_objs: List[SQLTableSchema]) -> str:
         """Get table context string."""
-        # print("--------- _get_table_context_str step test")
-        context_strs = []
+        context_strs = ""
         for table_schema_obj in table_schema_objs:
-            table_info = self.sql_database.get_single_table_info(
-                table_schema_obj.table_name
-            )
-            if table_schema_obj.context_str:
-                table_opt_context = " The table description is: "
-                table_opt_context += table_schema_obj.context_str
+            table_info = table_schema_obj.text
+            if table_schema_obj.metadata:
+                table_opt_context = "\nThe table description is: "
+                table_opt_context += table_schema_obj.metadata["schema_summary"]
                 table_info += table_opt_context
-
-            context_strs.append(table_info)
-            print(" ---------------- _get_table_context_str return:", "\n\n".join(context_strs))
-        return "\n\n".join(context_strs)
+                table_info += "\n\n"
+            context_strs += table_info
+        return context_strs
     
 
 async def starts_workflow(
@@ -739,22 +775,6 @@ async def starts_workflow(
     engine = create_engine(f"postgresql://{cnt_str.username}:{cnt_str.password}@{cnt_str.host}:{cnt_str.port}/{cnt_str.name}")
     sql_database = SQLDatabase(engine)
 
-    obj_retriever = SQLTableRetriever(
-        cnt_str=cnt_str,
-        tables=tables,
-        have_obj_index=have_obj_index
-    )
-
-    print("obj_retriever", obj_retriever)
-
-    sql_run_query = SQLRunQuery(
-        sql_database=sql_database
-    )
-
-    print("sql_run_query", sql_run_query)
-
-    llm=LLMFactory.create_llm("gpt-4o")
-
     if prompt_type == "text_to_sql":
         prompt_strategy=TextToSQLPromptStrategy("postgresql")
     if prompt_type == "optimize_sql":
@@ -764,12 +784,23 @@ async def starts_workflow(
     if prompt_type == "fix_sql":
         prompt_strategy=FixSQLQueryPromptStrategy("postgresql")
 
+    llm = LLMFactory.create_llm("gpt-4o")
+
     sql_generator = OpenAISQLGenerator(
         llm=llm,
         prompt_strategy=prompt_strategy
     )
 
-    print("sql_generator", sql_generator)
+    obj_retriever = SQLTableRetriever(
+        cnt_str=cnt_str,
+        sql_generator=sql_generator,
+        tables=tables,
+        have_obj_index=have_obj_index
+    )
+
+    sql_run_query = SQLRunQuery(
+        sql_database=sql_database
+    )
 
     txt_tosql_workflow = TextToSQLWorkflow(
         obj_retriever=obj_retriever,
@@ -793,16 +824,6 @@ async def starts_simple_workflow(
         prompt_type: str, 
         ) -> schemas.SynthesisResult:
 
-    schema_retriever = SQLSchemaRetriever(
-        db_name=db_name
-    )
-
-    print("schema_retriever", schema_retriever)
-
-    
-
-    llm = LLMFactory.create_llm("gpt-4o")
-    
     if prompt_type == "text_to_sql":
         prompt_strategy=TextToSQLPromptStrategy("postgresql")
     if prompt_type == "optimize_sql":
@@ -812,12 +833,18 @@ async def starts_simple_workflow(
     if prompt_type == "fix_sql":
         prompt_strategy=FixSQLQueryPromptStrategy("postgresql")
 
+    llm = LLMFactory.create_llm("gpt-4o")
     sql_generator = OpenAISQLGenerator(
         llm=llm,
         prompt_strategy=prompt_strategy
     )
 
-    print("sql_generator", sql_generator)
+    schema_retriever = SQLSchemaRetriever(
+        db_name=db_name,
+        sql_generator=sql_generator
+    )
+
+    print("schema_retriever", schema_retriever)
 
     txt_tosql_workflow = SimpleTextToSQLWorkflow(
         schema_retriever=schema_retriever,
