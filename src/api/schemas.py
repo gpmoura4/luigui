@@ -5,9 +5,8 @@ from llama_index.core.workflow import Event
 
 class TableInfo(BaseModel):
     """Information regarding a structured table."""
-    table_name: str = Field(
-        ..., description="table name (must be underscores and NO spaces)"
-    )
+    table_name: str 
+    table_context: Optional[str] = None
 
 
 class TableRetrieveEvent(Event):
