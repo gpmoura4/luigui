@@ -1,11 +1,14 @@
 import type React from "react"
-import ClientLayout from "./ClientLayout"
+import { AuthProvider } from "@/contexts/auth-context"
+import RootLayoutContent from "./root-layout-content"
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
-        <ClientLayout>{children}</ClientLayout>
+        <AuthProvider>
+          <RootLayoutContent>{children}</RootLayoutContent>
+        </AuthProvider>
       </body>
     </html>
   )

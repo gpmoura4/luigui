@@ -5,14 +5,25 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Users, Layers, Eye, X, Database, ChevronLeft, ChevronRight, Plus } from "lucide-react"
+import { Users, Layers, Eye, Database, ChevronLeft, ChevronRight, Plus, LogOut } from "lucide-react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/contexts/auth-context"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
+  const { user, logout } = useAuth()
+  const router = useRouter()
 
   // Carregar o estado de colapso do localStorage ao montar o componente
   useEffect(() => {
@@ -29,6 +40,21 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   const toggleSidebar = () => {
     setCollapsed(!collapsed)
+  }
+
+  const handleLogout = () => {
+    logout()
+    router.push("/login")
+  }
+
+  // Obter as iniciais do nome do usuário
+  const getInitials = (name: string) => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .substring(0, 2)
   }
 
   return (
@@ -70,7 +96,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           </Button>
         </div>
 
-        <ScrollArea className="h-[calc(100vh-128px)]">
+        <ScrollArea className="h-[calc(100vh-200px)]">
           <div className="space-y-4 p-4">
             <nav className="space-y-2">
               <Button
@@ -104,14 +130,46 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 </Link>
               </Button>
             </nav>
-            <div className="pt-4 border-t">
-              <Button variant="ghost" className={cn("w-full", collapsed ? "justify-center px-0" : "justify-start")}>
-                <Users className={cn("h-4 w-4", collapsed ? "mr-0" : "mr-2")} />
-                {!collapsed && <span>Usuário</span>}
-              </Button>
-            </div>
           </div>
         </ScrollArea>
+
+        {/* Perfil do usuário */}
+        <div className="absolute bottom-0 left-0 right-0 border-t p-4">
+          {user && (
+            <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between")}>
+              <div className={cn("flex items-center gap-2", collapsed && "hidden")}>
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium truncate max-w-[140px]">{user.name}</span>
+                  <span className="text-xs text-muted-foreground truncate max-w-[140px]">{user.email}</span>
+                </div>
+              </div>
+
+              {collapsed ? (
+                <Button variant="ghost" size="icon" onClick={handleLogout} title="Sair">
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              ) : (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <Users className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="cursor-pointer text-red-500" onClick={handleLogout}>
+                      <LogOut className="h-4 w-4 mr-2" />
+                      <span>Sair</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Main Content */}
@@ -126,8 +184,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
               {pathname === "/databases" && "Bancos de Dados"}
               {pathname === "/templates" && "Templates"}
             </h1>
-            <div className="flex items-center gap-2">
-            </div>
+            <div className="flex items-center gap-2"></div>
           </header>
           {children}
         </div>
