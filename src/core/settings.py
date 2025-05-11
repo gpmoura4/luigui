@@ -134,6 +134,11 @@ PASSWORD_HASHERS = [
     'django.contrib.auth.hashers.ScryptPasswordHasher',  
 ]
 
+AUTHENTICATION_BACKENDS = [
+    "allauth.account.auth_backends.AuthenticationBackend",  # <<< allauth primeiro
+    "django.contrib.auth.backends.ModelBackend",            # <<< depois o padrão
+]
+
 # Internationalization
 # https://docs.djangoproject.com/en/3.0/topics/i18n/
 
@@ -164,3 +169,12 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
 CORS_ALLOW_ALL_ORIGINS = True
+
+SITE_ID=1
+ACCOUNT_SIGNUP_FIELDS =  ['email*', 'password1*', 'password2*']
+ACCOUNT_LOGIN_METHODS = {'email'}
+ACCOUNT_AUTHENTICATION_METHOD = "email"        # lê o e-mail de 'username' ou 'email'
+ACCOUNT_EMAIL_REQUIRED        = True           # obriga ter e-mail
+ACCOUNT_USERNAME_REQUIRED     = False 
+ACCOUNT_EMAIL_VERIFICATION = 'none'  # pode usar 'mandatory' com setup de email
+ACCOUNT_LOGOUT_ON_GET = True
