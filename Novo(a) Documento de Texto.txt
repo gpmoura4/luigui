@@ -1,0 +1,14 @@
+
+
+Bom dia, professor, tudo certo? 
+
+Então, estávamos indo em frente com o TCC, o texto já está praticamente finalizado, 
+faltando só as partes "fixas", agradecimentos e etc. Sobre o código, também está praticamente pronto,
+estávamos vendo a questão da interface só. Entretanto, estamos pensando em não continuar com
+a ideia de implementar o front-end pela questão do prazo, basicamente, 
+estamos com o prazo cada vez mais apertado não só com a entrega do TCC, 
+mas também com as outras matérias que estamos finalizando da faculdade, já começamos o período de provas 
+e apresentação dos trabalhos, tentando conciliar com o trabalho/estágio. 
+
+Por isso, queríamos focar em fazer os últimos refinamentos no código e no texto em si nessas últimas
+semanas desse mês (Queremos entregar até o final desse mês de maio). O que o senhor acha?

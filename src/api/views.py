@@ -282,6 +282,7 @@ class TableDetail(APIView):
 
 
 class QuestionAnswerList(APIView):    
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     def post(self, request, database, format=None):
         print("starting post question answer list")
         try: 
