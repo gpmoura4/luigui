@@ -11,14 +11,15 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { ProtectedRoute } from "@/components/protected-route"
 
-// Lista de bancos de dados fictícios para demonstração
-const databases = [
-  { id: "db1", name: "Vendas" },
-  { id: "db2", name: "Recursos Humanos" },
-  { id: "db3", name: "Inventário" },
-  { id: "db4", name: "Financeiro" },
-  { id: "db5", name: "Marketing" },
-]
+// Interface para o tipo Database baseado no serializer do Django
+interface Database {
+  id: string
+  name: string
+  type: "complete" | "minimal"
+  username?: string
+  port?: string
+  host?: string
+}
 
 // Lista de templates disponíveis
 const templates = [
@@ -46,14 +47,52 @@ const templates = [
 
 export default function QuestionAnswerInterface() {
   const searchParams = useSearchParams()
-
+  const [databases, setDatabases] = useState<Database[]>([])
+  const [isLoadingDatabases, setIsLoadingDatabases] = useState(true)
   const [question, setQuestion] = useState("")
   const [answer, setAnswer] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [selectedDb, setSelectedDb] = useState(databases[0])
+  const [selectedDb, setSelectedDb] = useState<Database | null>(null)
   const [sqlQuery, setSqlQuery] = useState("")
   const [isSqlOpen, setIsSqlOpen] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<(typeof templates)[0] | null>(null)
+
+  // Função para buscar os databases da API
+  const fetchDatabases = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/databases/`, {
+        credentials: 'include', // Importante para enviar cookies
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch databases')
+      }
+
+      const data = await response.json()
+      setDatabases(data)
+      
+      // Se houver um database ID na URL, seleciona ele
+      const dbId = searchParams.get("db")
+      if (dbId) {
+        const selectedDatabase = data.find((db: Database) => db.id === dbId)
+        if (selectedDatabase) {
+          setSelectedDb(selectedDatabase)
+        }
+      } else if (data.length > 0) {
+        // Se não houver ID na URL mas houver databases, seleciona o primeiro
+        setSelectedDb(data[0])
+      }
+    } catch (error) {
+      console.error('Error fetching databases:', error)
+    } finally {
+      setIsLoadingDatabases(false)
+    }
+  }
+
+  // Carregar databases quando o componente montar
+  useEffect(() => {
+    fetchDatabases()
+  }, [searchParams])
 
   // Carregar template e pergunta dos parâmetros de URL
   useEffect(() => {
@@ -69,14 +108,6 @@ export default function QuestionAnswerInterface() {
     } else if (questionParam) {
       setQuestion(questionParam)
     }
-
-    const dbId = searchParams.get("db")
-    if (dbId) {
-      const db = databases.find((d) => d.id === dbId)
-      if (db) {
-        setSelectedDb(db)
-      }
-    }
   }, [searchParams])
 
   const handleSubmit = async () => {
@@ -90,8 +121,8 @@ export default function QuestionAnswerInterface() {
       const generatedSql = `SELECT 
   c.customer_name,
   SUM(o.total_amount) as total_purchases
-FROM ${selectedDb.name.toLowerCase().replace(" ", "_")}.customers c
-JOIN ${selectedDb.name.toLowerCase().replace(" ", "_")}.orders o
+FROM ${selectedDb?.name.toLowerCase().replace(" ", "_")}.customers c
+JOIN ${selectedDb?.name.toLowerCase().replace(" ", "_")}.orders o
   ON c.customer_id = o.customer_id
 WHERE o.purchase_date > '2023-01-01'
 GROUP BY c.customer_id, c.customer_name
@@ -101,7 +132,7 @@ LIMIT 10;`
       setSqlQuery(generatedSql)
 
       setAnswer(
-        `Com base na sua pergunta: "${question}" consultando o banco de dados "${selectedDb.name}"\n\nEncontrei os 10 clientes com as maiores compras desde janeiro de 2023. O cliente João Silva lidera com R$15.750 em compras, seguido por Maria Oliveira com R$12.320. A média de compras destes clientes é de R$8.940.\n\nOs dados completos estão disponíveis na tabela abaixo.`,
+        `Com base na sua pergunta: "${question}" consultando o banco de dados "${selectedDb?.name}"\n\nEncontrei os 10 clientes com as maiores compras desde janeiro de 2023. O cliente João Silva lidera com R$15.750 em compras, seguido por Maria Oliveira com R$12.320. A média de compras destes clientes é de R$8.940.\n\nOs dados completos estão disponíveis na tabela abaixo.`,
       )
       setIsLoading(false)
       setIsSqlOpen(true) // Mostrar SQL automaticamente na primeira resposta
@@ -169,9 +200,15 @@ LIMIT 10;`
                 <div className="flex justify-between items-center">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="gap-2">
+                      <Button variant="outline" className="gap-2" disabled={isLoadingDatabases}>
                         <Database className="h-4 w-4" />
-                        {selectedDb.name}
+                        {isLoadingDatabases ? (
+                          "Carregando..."
+                        ) : selectedDb ? (
+                          selectedDb.name
+                        ) : (
+                          "Selecione um banco"
+                        )}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start">
@@ -188,7 +225,11 @@ LIMIT 10;`
                     </DropdownMenuContent>
                   </DropdownMenu>
 
-                  <Button onClick={handleSubmit} disabled={!question.trim() || isLoading} className="px-8">
+                  <Button 
+                    onClick={handleSubmit} 
+                    disabled={!question.trim() || isLoading || !selectedDb} 
+                    className="px-8"
+                  >
                     {isLoading ? "Processando..." : "Enviar"}
                   </Button>
                 </div>
