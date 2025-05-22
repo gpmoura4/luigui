@@ -1,22 +1,23 @@
-import type React from "react"
-import { AuthProvider } from "@/contexts/auth-context"
-import RootLayoutContent from "./root-layout-content"
+import { Inter } from 'next/font/google';
+import './globals.css';
+import { Providers } from './providers';
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+const inter = Inter({ subsets: ['latin'] });
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
-      <body>
-        <AuthProvider>
-          <RootLayoutContent>{children}</RootLayoutContent>
-        </AuthProvider>
+      <body className={inter.className}>
+        <Providers>{children}</Providers>
       </body>
     </html>
-  )
+  );
 }
 
-
-import './globals.css'
-
 export const metadata = {
-      generator: 'v0.dev'
-    };
+  generator: 'v0.dev'
+};

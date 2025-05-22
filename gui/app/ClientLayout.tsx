@@ -22,8 +22,25 @@ import {
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
-  const { user, logout } = useAuth()
+  const { user, logout, isAuthenticated } = useAuth()
   const router = useRouter()
+
+  // Adicionar verificação de autenticação
+  useEffect(() => {
+    // Se não estiver autenticado e não estiver na página de login, redireciona para login
+    if (!isAuthenticated && pathname !== '/login') {
+      router.push('/login')
+    }
+    // Se estiver autenticado e estiver na página de login, redireciona para home
+    else if (isAuthenticated && pathname === '/login') {
+      router.push('/')
+    }
+  }, [isAuthenticated, pathname, router])
+
+  // Se não estiver autenticado, não renderiza o layout
+  if (!isAuthenticated) {
+    return null // ou pode retornar um loading spinner se desejar
+  }
 
   // Carregar o estado de colapso do localStorage ao montar o componente
   useEffect(() => {
@@ -42,8 +59,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     setCollapsed(!collapsed)
   }
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await logout()
     router.push("/login")
   }
 
