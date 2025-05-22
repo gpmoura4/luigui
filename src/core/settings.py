@@ -41,24 +41,35 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1', config('SERVER', default='127.0.0.1')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
+    'django.contrib.sites',  
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'api',  # Enable the inner home (home)
+    'rest_framework.authtoken',
+    
+    'api', 
     "rest_framework",
+    'corsheaders',
+    'dj_rest_auth',
+    'dj_rest_auth.registration',
+    'allauth',
+    'allauth.account',    
+    'allauth.socialaccount'
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = "core.urls"
@@ -123,6 +134,11 @@ PASSWORD_HASHERS = [
     'django.contrib.auth.hashers.ScryptPasswordHasher',  
 ]
 
+AUTHENTICATION_BACKENDS = [
+    "allauth.account.auth_backends.AuthenticationBackend",  # <<< allauth primeiro
+    "django.contrib.auth.backends.ModelBackend",            # <<< depois o padrão
+]
+
 # Internationalization
 # https://docs.djangoproject.com/en/3.0/topics/i18n/
 
@@ -150,3 +166,36 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 #############################################################
 #############################################################
+
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]
+CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+]
+
+SITE_ID=1
+ACCOUNT_SIGNUP_FIELDS =  ['email*', 'password1*', 'password2*']
+ACCOUNT_LOGIN_METHODS = {'email'}
+ACCOUNT_AUTHENTICATION_METHOD = "email"        # lê o e-mail de 'username' ou 'email'
+ACCOUNT_EMAIL_REQUIRED        = True           # obriga ter e-mail
+ACCOUNT_USERNAME_REQUIRED     = False 
+ACCOUNT_EMAIL_VERIFICATION = 'none'  # pode usar 'mandatory' com setup de email
+ACCOUNT_LOGOUT_ON_GET = True
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+
+REST_AUTH = {
+    'USER_DETAILS_SERIALIZER': 'dj_rest_auth.serializers.UserDetailsSerializer',
+}
