@@ -48,8 +48,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         credentials: 'include',
       });
       if (response.ok) {
-        const csrfToken = response.headers.get('X-CSRFToken');
-        return csrfToken;
+        // Get the CSRF token from cookies
+        const cookies = document.cookie.split(';');
+        const csrfCookie = cookies.find(cookie => cookie.trim().startsWith('csrftoken='));
+        if (csrfCookie) {
+          return csrfCookie.split('=')[1];
+        }
       }
     } catch (error) {
       console.error('Error fetching CSRF token:', error);
