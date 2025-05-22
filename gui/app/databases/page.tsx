@@ -6,6 +6,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Database, Edit, Plus, FileCode } from "lucide-react"
 import Link from "next/link"
 import { DatabaseFormDialog } from "@/components/database-form-dialog"
+import { ProtectedRoute } from "@/components/protected-route"
 
 // Dados de exemplo para demonstração
 const sampleDatabases = [
@@ -63,57 +64,59 @@ export default function DatabasesPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col p-6 overflow-y-auto">
-      <div className="w-full max-w-6xl mx-auto">
-        {/* Cabeçalho com título */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold mb-2">Bancos de Dados</h1>
-          <p className="text-muted-foreground">
-            Gerencie suas conexões de banco de dados para consultas em linguagem natural.
-          </p>
-        </div>
-
-        {/* Seção de call-to-action e botão New Database */}
-        <div className="bg-muted/30 rounded-lg p-6 mb-8 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div>
-            <h2 className="text-lg font-medium mb-1">Registre um novo banco de dados</h2>
-            <p className="text-muted-foreground max-w-xl">
-              Conecte seu banco de dados para começar a fazer consultas em linguagem natural. Suportamos PostgreSQL,
-              MySQL, SQL Server e outros.
+    <ProtectedRoute>
+      <div className="flex-1 flex flex-col p-6 overflow-y-auto">
+        <div className="w-full max-w-6xl mx-auto">
+          {/* Cabeçalho com título */}
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold mb-2">Bancos de Dados</h1>
+            <p className="text-muted-foreground">
+              Gerencie suas conexões de banco de dados para consultas em linguagem natural.
             </p>
           </div>
-          <Button className="gap-2 whitespace-nowrap" size="lg" onClick={handleNewDatabase}>
-            <Plus className="h-4 w-4" />
-            Novo Banco de Dados
-          </Button>
-        </div>
 
-        {/* Grid de cards de bancos de dados */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {databases.map((db) => (
-            <DatabaseCard key={db.id} database={db} onEdit={() => handleEditDatabase(db)} />
-          ))}
-        </div>
-
-        {/* Mensagem para quando não há bancos de dados */}
-        {databases.length === 0 && (
-          <div className="text-center py-12">
-            <Database className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">Nenhum banco de dados registrado</h3>
-            <p className="text-muted-foreground mb-4">
-              Registre seu primeiro banco de dados para começar a fazer consultas.
-            </p>
-            <Button className="gap-2" onClick={handleNewDatabase}>
+          {/* Seção de call-to-action e botão New Database */}
+          <div className="bg-muted/30 rounded-lg p-6 mb-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div>
+              <h2 className="text-lg font-medium mb-1">Registre um novo banco de dados</h2>
+              <p className="text-muted-foreground max-w-xl">
+                Conecte seu banco de dados para começar a fazer consultas em linguagem natural. Suportamos PostgreSQL,
+                MySQL, SQL Server e outros.
+              </p>
+            </div>
+            <Button className="gap-2 whitespace-nowrap" size="lg" onClick={handleNewDatabase}>
               <Plus className="h-4 w-4" />
               Novo Banco de Dados
             </Button>
           </div>
-        )}
-      </div>
 
-      {/* Modal de formulário */}
-      <DatabaseFormDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} database={selectedDatabase} />
-    </div>
+          {/* Grid de cards de bancos de dados */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {databases.map((db) => (
+              <DatabaseCard key={db.id} database={db} onEdit={() => handleEditDatabase(db)} />
+            ))}
+          </div>
+
+          {/* Mensagem para quando não há bancos de dados */}
+          {databases.length === 0 && (
+            <div className="text-center py-12">
+              <Database className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">Nenhum banco de dados registrado</h3>
+              <p className="text-muted-foreground mb-4">
+                Registre seu primeiro banco de dados para começar a fazer consultas.
+              </p>
+              <Button className="gap-2" onClick={handleNewDatabase}>
+                <Plus className="h-4 w-4" />
+                Novo Banco de Dados
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Modal de formulário */}
+        <DatabaseFormDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} database={selectedDatabase} />
+      </div>
+    </ProtectedRoute>
   )
 }
 

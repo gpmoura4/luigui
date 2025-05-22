@@ -1,31 +1,49 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface AuthContextType {
   isAuthenticated: boolean;
   user: any | null;
+  loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      setIsAuthenticated(true);
-      fetchUserData(token);
-    }
+    const initAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          await fetchUserData(token);
+          setIsAuthenticated(true);
+        } catch (error) {
+          console.error('Error initializing auth:', error);
+          localStorage.removeItem('token');
+          setIsAuthenticated(false);
+          setUser(null);
+        }
+      }
+      setLoading(false);
+    };
+
+    initAuth();
   }, []);
 
   const getCsrfToken = async () => {
     try {
-      const response = await fetch('http://localhost:8080/dj-rest-auth/csrf/', {
+      const response = await fetch(`${API_URL}/api/csrf/`, {
         method: 'GET',
         credentials: 'include',
       });
@@ -40,19 +58,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const fetchUserData = async (token: string) => {
+    if (!token) return;
+    
     try {
-      const response = await fetch('http://localhost:8080/dj-rest-auth/user/', {
+      const response = await fetch(`${API_URL}/api/auth/user/`, {
+        method: 'GET',
         headers: {
-          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json',
+          'Authorization': `Token ${token}`
         },
         credentials: 'include',
       });
+      
       if (response.ok) {
         const userData = await response.json();
         setUser(userData);
+        setIsAuthenticated(true);
+      } else {
+        const errorData = await response.json();
+        console.error('Failed to fetch user data:', errorData);
+        throw new Error('Failed to fetch user data');
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
+      throw error;
     }
   };
 
@@ -60,7 +89,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const csrfToken = await getCsrfToken();
       
-      const response = await fetch('http://localhost:8080/dj-rest-auth/login/', {
+      const response = await fetch(`${API_URL}/api/auth/login/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -72,15 +101,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('Login response not OK:', response.status, errorData);
         throw new Error(errorData.non_field_errors?.[0] || 'Login failed');
       }
 
       const data = await response.json();
+      console.log('Login response:', data);
+      
       if (data.key) {
-        localStorage.setItem('token', data.key);
+        const token = data.key;
+        console.log('Setting token:', token);
+        localStorage.setItem('token', token);
+        // Set token as cookie
+        document.cookie = `token=${token}; path=/`;
         setIsAuthenticated(true);
-        await fetchUserData(data.key);
+        await fetchUserData(token);
+        
+        // Redirecionar para a página de databases após login bem-sucedido
+        router.push('/databases');
       } else {
+        console.error('No key in response:', data);
         throw new Error('No authentication token received');
       }
     } catch (error) {
@@ -92,14 +132,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) return;
+
       const csrfToken = await getCsrfToken();
 
-      await fetch('http://localhost:8080/dj-rest-auth/logout/', {
+      await fetch(`${API_URL}/api/auth/logout/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Token ${token}`,
-          ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
+          ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {})
         },
         credentials: 'include',
       });
@@ -107,13 +149,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Logout error:', error);
     } finally {
       localStorage.removeItem('token');
+      // Remove token cookie
+      document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
       setIsAuthenticated(false);
       setUser(null);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

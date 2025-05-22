@@ -22,24 +22,31 @@ import {
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
-  const { user, logout, isAuthenticated } = useAuth()
+  const { user, logout, isAuthenticated, loading } = useAuth()
   const router = useRouter()
 
   // Adicionar verificação de autenticação
   useEffect(() => {
-    // Se não estiver autenticado e não estiver na página de login, redireciona para login
-    if (!isAuthenticated && pathname !== '/login') {
-      router.push('/login')
+    if (!loading) {  // Só verifica após carregar o estado de autenticação
+      if (!isAuthenticated && pathname !== '/login') {
+        router.push('/login')
+      } else if (isAuthenticated && pathname === '/login') {
+        router.push('/databases')
+      }
     }
-    // Se estiver autenticado e estiver na página de login, redireciona para home
-    else if (isAuthenticated && pathname === '/login') {
-      router.push('/')
-    }
-  }, [isAuthenticated, pathname, router])
+  }, [isAuthenticated, loading, pathname, router])
 
-  // Se não estiver autenticado, não renderiza o layout
-  if (!isAuthenticated) {
-    return null // ou pode retornar um loading spinner se desejar
+  // Se estiver carregando ou não estiver autenticado, mostra loading ou nada
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated && pathname !== '/login') {
+    return null
   }
 
   // Carregar o estado de colapso do localStorage ao montar o componente

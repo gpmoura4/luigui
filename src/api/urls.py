@@ -13,6 +13,7 @@ urlpatterns = [
     path('databases/<int:database>/tables/',  views.TableList.as_view() ),
     path('databases/<int:database>/tables/<int:pk>/',  views.TableDetail.as_view() ),
     path('databases/<int:database>/question',  views.QuestionAnswerList.as_view() ),
+    path('csrf/', views.get_csrf, name='csrf'),
 ]
 
 

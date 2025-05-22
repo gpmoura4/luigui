@@ -13,9 +13,12 @@ from django.contrib.auth.models import User
 from rest_framework import generics
 from rest_framework import permissions
 from api.permissions import IsOwner, IsOwnerTable
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.http import JsonResponse
 
-
-
+@ensure_csrf_cookie
+def get_csrf(request):
+    return JsonResponse({'detail': 'CSRF cookie set'})
 
 class UserList(generics.ListAPIView):
     queryset = User.objects.all()
@@ -358,8 +361,6 @@ class QuestionAnswerList(APIView):
         questions = QuestionAnswer.objects.filter(database=database)
         serializer = QuestionAnswerSerializer(questions, many=True)
         return Response(serializer.data)
-
-
 
 
         

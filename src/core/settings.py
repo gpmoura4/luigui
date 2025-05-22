@@ -168,7 +168,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 #############################################################
 
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]
+CORS_ALLOW_CREDENTIALS = True
 
 SITE_ID=1
 ACCOUNT_SIGNUP_FIELDS =  ['email*', 'password1*', 'password2*']
@@ -178,3 +181,17 @@ ACCOUNT_EMAIL_REQUIRED        = True           # obriga ter e-mail
 ACCOUNT_USERNAME_REQUIRED     = False 
 ACCOUNT_EMAIL_VERIFICATION = 'none'  # pode usar 'mandatory' com setup de email
 ACCOUNT_LOGOUT_ON_GET = True
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+
+REST_AUTH = {
+    'USER_DETAILS_SERIALIZER': 'dj_rest_auth.serializers.UserDetailsSerializer',
+}
