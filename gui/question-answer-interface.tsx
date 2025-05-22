@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
+import { ProtectedRoute } from "@/components/protected-route"
 
 // Lista de bancos de dados fictícios para demonstração
 const databases = [
@@ -126,127 +127,129 @@ LIMIT 10;`
   }
 
   return (
-    <div className="flex-1 flex flex-col items-center p-6 gap-6 overflow-y-auto">
-      <div className="w-full max-w-4xl mx-auto">
-        <Card className="shadow-md">
-          <CardContent className="pt-6">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-lg font-medium">Faça sua pergunta</h2>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="gap-2">
-                      <Sparkles className="h-4 w-4" />
-                      {selectedTemplate ? selectedTemplate.name : "Escolher Template"}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    {templates.map((template) => (
-                      <DropdownMenuItem
-                        key={template.id}
-                        onClick={() => applyTemplate(template)}
-                        className="cursor-pointer"
-                      >
-                        {template.name}
-                      </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuItem asChild className="cursor-pointer text-primary">
-                      <Link href="/templates" className="w-full">
-                        Ver todos os templates
-                      </Link>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              <Textarea
-                placeholder="Digite sua pergunta aqui... (ex: 'Quais são os 10 clientes com maior valor de compra desde janeiro de 2023?')"
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                className="min-h-[100px] resize-none"
-              />
-              <div className="flex justify-between items-center">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="gap-2">
-                      <Database className="h-4 w-4" />
-                      {selectedDb.name}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    {databases.map((db) => (
-                      <DropdownMenuItem key={db.id} onClick={() => setSelectedDb(db)} className="cursor-pointer">
-                        {db.name}
-                      </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuItem asChild className="cursor-pointer text-primary">
-                      <Link href="/databases" className="w-full">
-                        Gerenciar bancos de dados
-                      </Link>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                <Button onClick={handleSubmit} disabled={!question.trim() || isLoading} className="px-8">
-                  {isLoading ? "Processando..." : "Enviar"}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {answer && (
-          <Card className="mt-6 shadow-md">
+    <ProtectedRoute>
+      <div className="flex-1 flex flex-col items-center p-6 gap-6 overflow-y-auto">
+        <div className="w-full max-w-4xl mx-auto">
+          <Card className="shadow-md">
             <CardContent className="pt-6">
-              <div className="space-y-4">
-                {/* Resposta em linguagem natural com ícone de cópia no canto superior direito */}
-                <div className="relative p-4 bg-muted/50 rounded-lg min-h-[150px]">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 h-8 w-8"
-                    title="Copiar resposta"
-                    onClick={() => copyToClipboard(answer)}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <p className="text-sm whitespace-pre-wrap pr-10">{answer}</p>
-                </div>
-
-                {/* SQL Query colapsável */}
-                {sqlQuery && (
-                  <Collapsible open={isSqlOpen} onOpenChange={setIsSqlOpen} className="border rounded-md">
-                    <CollapsibleTrigger asChild>
-                      <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/30 border-b border-b-transparent data-[state=open]:border-b-border">
-                        <div className="flex items-center gap-2">
-                          <Code className="h-4 w-4 text-muted-foreground" />
-                          <h3 className="text-sm font-medium">SQL Gerado</h3>
-                        </div>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          {isSqlOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="relative p-3 bg-black text-green-400 rounded-b-md overflow-x-auto">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="absolute top-2 right-2 h-8 w-8 text-white hover:text-white hover:bg-white/10"
-                          title="Copiar SQL"
-                          onClick={() => copyToClipboard(sqlQuery)}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-lg font-medium">Faça sua pergunta</h2>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="gap-2">
+                        <Sparkles className="h-4 w-4" />
+                        {selectedTemplate ? selectedTemplate.name : "Escolher Template"}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      {templates.map((template) => (
+                        <DropdownMenuItem
+                          key={template.id}
+                          onClick={() => applyTemplate(template)}
+                          className="cursor-pointer"
                         >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                        <pre className="text-sm pr-10">{sqlQuery}</pre>
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                )}
+                          {template.name}
+                        </DropdownMenuItem>
+                      ))}
+                      <DropdownMenuItem asChild className="cursor-pointer text-primary">
+                        <Link href="/templates" className="w-full">
+                          Ver todos os templates
+                        </Link>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <Textarea
+                  placeholder="Digite sua pergunta aqui... (ex: 'Quais são os 10 clientes com maior valor de compra desde janeiro de 2023?')"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  className="min-h-[100px] resize-none"
+                />
+                <div className="flex justify-between items-center">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="gap-2">
+                        <Database className="h-4 w-4" />
+                        {selectedDb.name}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      {databases.map((db) => (
+                        <DropdownMenuItem key={db.id} onClick={() => setSelectedDb(db)} className="cursor-pointer">
+                          {db.name}
+                        </DropdownMenuItem>
+                      ))}
+                      <DropdownMenuItem asChild className="cursor-pointer text-primary">
+                        <Link href="/databases" className="w-full">
+                          Gerenciar bancos de dados
+                        </Link>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <Button onClick={handleSubmit} disabled={!question.trim() || isLoading} className="px-8">
+                    {isLoading ? "Processando..." : "Enviar"}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
-        )}
+
+          {answer && (
+            <Card className="mt-6 shadow-md">
+              <CardContent className="pt-6">
+                <div className="space-y-4">
+                  {/* Resposta em linguagem natural com ícone de cópia no canto superior direito */}
+                  <div className="relative p-4 bg-muted/50 rounded-lg min-h-[150px]">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 right-2 h-8 w-8"
+                      title="Copiar resposta"
+                      onClick={() => copyToClipboard(answer)}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <p className="text-sm whitespace-pre-wrap pr-10">{answer}</p>
+                  </div>
+
+                  {/* SQL Query colapsável */}
+                  {sqlQuery && (
+                    <Collapsible open={isSqlOpen} onOpenChange={setIsSqlOpen} className="border rounded-md">
+                      <CollapsibleTrigger asChild>
+                        <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/30 border-b border-b-transparent data-[state=open]:border-b-border">
+                          <div className="flex items-center gap-2">
+                            <Code className="h-4 w-4 text-muted-foreground" />
+                            <h3 className="text-sm font-medium">SQL Gerado</h3>
+                          </div>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            {isSqlOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="relative p-3 bg-black text-green-400 rounded-b-md overflow-x-auto">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 h-8 w-8 text-white hover:text-white hover:bg-white/10"
+                            title="Copiar SQL"
+                            onClick={() => copyToClipboard(sqlQuery)}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <pre className="text-sm pr-10">{sqlQuery}</pre>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
-    </div>
+    </ProtectedRoute>
   )
 }
