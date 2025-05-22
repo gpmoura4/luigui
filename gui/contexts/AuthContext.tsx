@@ -121,8 +121,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsAuthenticated(true);
         await fetchUserData(token);
         
-        // Redirecionar para a página de databases após login bem-sucedido
-        router.push('/databases');
+        // Redirecionar para a página inicial após login bem-sucedido
+        router.push('/');
       } else {
         console.error('No key in response:', data);
         throw new Error('No authentication token received');

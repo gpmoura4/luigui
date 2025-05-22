@@ -14,6 +14,7 @@ type AuthContextType = {
   register: (name: string, email: string, password: string) => Promise<boolean>
   logout: () => void
   isLoading: boolean
+  isAuthenticated: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
