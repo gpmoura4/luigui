@@ -91,10 +91,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           collapsed ? "w-16" : "w-64",
         )}
       >
-        <div className="p-4 border-b flex items-center justify-between">
+        <div className="px-4 border-b flex items-center justify-between h-14">
           <div className={cn("flex items-center gap-2", collapsed && "justify-center")}>
             <div className="h-6 w-6 rounded-full bg-primary flex-shrink-0" />
-            {!collapsed && <span className="font-semibold">Text-To-SQL</span>}
+            {!collapsed && <span className="font-semibold">Luigui</span>}
           </div>
           <Button
             variant="ghost"
@@ -157,59 +157,30 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             </nav>
           </div>
         </ScrollArea>
-
-        {/* Perfil do usuário */}
-        <div className="absolute bottom-0 left-0 right-0 border-t p-4">
-          {user && (
-            <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between")}>
-              <div className={cn("flex items-center gap-2", collapsed && "hidden")}>
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback>{user?.name ? getInitials(user.name) : ""}</AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium truncate max-w-[140px]">{user.name}</span>
-                  <span className="text-xs text-muted-foreground truncate max-w-[140px]">{user.email}</span>
-                </div>
-              </div>
-
-              {collapsed ? (
-                <Button variant="ghost" size="icon" onClick={handleLogout} title="Sair">
-                  <LogOut className="h-4 w-4" />
-                </Button>
-              ) : (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <Users className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="cursor-pointer text-red-500" onClick={handleLogout}>
-                      <LogOut className="h-4 w-4 mr-2" />
-                      <span>Sair</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col">
           {/* Header */}
-          <header className="h-14 border-b px-4 flex items-center justify-between">
+          <header className="border-b px-4 flex items-center justify-between bg-muted/10 h-14">
             <h1 className="text-sm font-medium">
-              {pathname === "/" && "Nova Consulta"}
               {pathname === "/queries" && "Histórico de Consultas"}
               {pathname.startsWith("/queries/") && "Detalhes da Consulta"}
               {pathname === "/databases" && "Bancos de Dados"}
               {pathname === "/templates" && "Templates"}
             </h1>
-            <div className="flex items-center gap-2"></div>
+            {user && (
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col items-end">
+                  <span className="text-sm font-medium">{user.name}</span>
+                  <span className="text-xs text-muted-foreground">{user.email}</span>
+                </div>
+                <Button variant="ghost" size="icon" onClick={handleLogout} title="Sair">
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </header>
           {children}
         </div>
