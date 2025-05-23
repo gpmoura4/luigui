@@ -170,66 +170,67 @@ LIMIT 10;`
         <Card className="shadow-md">
           <CardContent className="pt-6">
             <div className="space-y-2">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-lg font-medium">Faça sua pergunta</h2>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="gap-2">
-                      <Sparkles className="h-4 w-4" />
-                      {selectedTemplate ? selectedTemplate.name : "Escolher Template"}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    {templates.map((template) => (
-                      <DropdownMenuItem
-                        key={template.id}
-                        onClick={() => applyTemplate(template)}
-                        className="cursor-pointer"
-                      >
-                        {template.name}
-                      </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuItem asChild className="cursor-pointer text-primary">
-                      <Link href="/templates" className="w-full">
-                        Ver todos os templates
-                      </Link>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+              <h2 className="text-lg font-medium">Faça sua pergunta</h2>
               <Textarea
                 placeholder="Digite sua pergunta aqui... (ex: 'Quais são os 10 clientes com maior valor de compra desde janeiro de 2023?')"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 className="min-h-[100px] resize-none"
               />
-              <div className="flex justify-between items-center">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="gap-2" disabled={isLoadingDatabases}>
-                      <Database className="h-4 w-4" />
-                      {isLoadingDatabases ? (
-                        "Carregando..."
-                      ) : selectedDb ? (
-                        selectedDb.name
-                      ) : (
-                        "Selecione um banco"
-                      )}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    {databases.map((db) => (
-                      <DropdownMenuItem key={db.id} onClick={() => setSelectedDb(db)} className="cursor-pointer">
-                        {db.name}
+              <div className="flex justify-between items-center gap-4">
+                <div className="flex gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="gap-2" disabled={isLoadingDatabases}>
+                        <Database className="h-4 w-4" />
+                        {isLoadingDatabases ? (
+                          "Carregando..."
+                        ) : selectedDb ? (
+                          selectedDb.name
+                        ) : (
+                          "Selecione um banco"
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      {databases.map((db) => (
+                        <DropdownMenuItem key={db.id} onClick={() => setSelectedDb(db)} className="cursor-pointer">
+                          {db.name}
+                        </DropdownMenuItem>
+                      ))}
+                      <DropdownMenuItem asChild className="cursor-pointer text-primary">
+                        <Link href="/databases" className="w-full">
+                          Gerenciar bancos de dados
+                        </Link>
                       </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuItem asChild className="cursor-pointer text-primary">
-                      <Link href="/databases" className="w-full">
-                        Gerenciar bancos de dados
-                      </Link>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="gap-2">
+                        <Sparkles className="h-4 w-4" />
+                        {selectedTemplate ? selectedTemplate.name : "Escolher Template"}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      {templates.map((template) => (
+                        <DropdownMenuItem
+                          key={template.id}
+                          onClick={() => applyTemplate(template)}
+                          className="cursor-pointer"
+                        >
+                          {template.name}
+                        </DropdownMenuItem>
+                      ))}
+                      <DropdownMenuItem asChild className="cursor-pointer text-primary">
+                        <Link href="/templates" className="w-full">
+                          Ver todos os templates
+                        </Link>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
 
                 <Button 
                   onClick={handleSubmit} 
