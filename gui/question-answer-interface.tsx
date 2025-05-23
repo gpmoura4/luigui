@@ -66,7 +66,7 @@ export default function QuestionAnswerInterface() {
   const [selectedDb, setSelectedDb] = useState<Database | null>(null)
   const [sqlQuery, setSqlQuery] = useState("")
   const [isSqlOpen, setIsSqlOpen] = useState(false)
-  const [selectedTemplate, setSelectedTemplate] = useState<(typeof templates)[0] | null>(null)
+  const [selectedTemplate, setSelectedTemplate] = useState<(typeof templates)[0]>(templates[0])
 
   // Função para buscar os databases da API
   const fetchDatabases = async () => {
@@ -181,9 +181,15 @@ LIMIT 10;`
           <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
             Transforme suas perguntas em consultas SQL poderosas
           </h1>
-          <p className="text-muted-foreground mt-2">
-            Use linguagem natural para criar, otimizar e entender consultas SQL de forma simples e rápida
-          </p>
+          <div className="flex flex-col items-center text-center gap-1 mt-2">
+            <p className="text-xl font-medium text-primary">
+              Pergunte em português, receba em SQL
+            </p>
+            <p className="text-muted-foreground text-sm max-w-2xl">
+              Conecte seu banco de dados para ver os resultados em tempo real. 
+              Aproveite recursos extras para otimizar, entender e corrigir suas consultas.
+            </p>
+          </div>
         </div>
         <Card className="shadow-md">
           <CardContent className="pt-6">
