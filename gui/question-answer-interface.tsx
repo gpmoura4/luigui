@@ -27,28 +27,32 @@ const templates = [
     name: "Gerar Consulta SQL",
     prompt: "",
     title: "Faça sua pergunta",
-    placeholder: "Exemplo: Quais são os produtos mais vendidos?"
+    placeholder: "Exemplo: Quais são os produtos mais vendidos?",
+    apiValue: "text_to_sql"
   },
   {
     id: "optimize",
     name: "Otimizar Consulta",
     prompt: "",
     title: "Otimize uma consulta SQL",
-    placeholder: "Exemplo: SELECT * FROM produtos p JOIN categorias c ON p.categoria_id = c.id WHERE p.preco > 100;"
+    placeholder: "Exemplo: SELECT * FROM produtos p JOIN categorias c ON p.categoria_id = c.id WHERE p.preco > 100;",
+    apiValue: "optimize_sql"
   },
   {
     id: "explain",
     name: "Explicar Consulta",
     prompt: "",
     title: "Receba uma explicação detalhada da sua consulta",
-    placeholder: "Exemplo: SELECT nome, COUNT(*) as total FROM vendas GROUP BY nome HAVING COUNT(*) > 5;"
+    placeholder: "Exemplo: SELECT nome, COUNT(*) as total FROM vendas GROUP BY nome HAVING COUNT(*) > 5;",
+    apiValue: "explain_sql"
   },
   {
     id: "correct",
     name: "Corrigir Consulta",
     prompt: "",
     title: "Corrija uma consulta SQL",
-    placeholder: "Exemplo: SELECT nome, preco FROM produtos WERE preco > 100 ORDERY BY preco;"
+    placeholder: "Exemplo: SELECT nome, preco FROM produtos WERE preco > 100 ORDERY BY preco;",
+    apiValue: "fix_sql"
   },
 ]
 
@@ -122,8 +126,14 @@ export default function QuestionAnswerInterface() {
 
     setIsLoading(true)
 
+    // Aqui você terá acesso ao tipo de template selecionado através de selectedTemplate?.apiValue
+    const templateType = selectedTemplate?.apiValue || "text_to_sql" // default para text_to_sql se nenhum template estiver selecionado
+
     // Simulando uma resposta da API com SQL gerado
     setTimeout(() => {
+      // TODO: Enviar templateType para a API quando implementar a chamada real
+      console.log("Template type to be sent to API:", templateType)
+
       // Exemplo de SQL que seria gerado baseado na pergunta
       const generatedSql = `SELECT 
   c.customer_name,
