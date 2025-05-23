@@ -159,6 +159,14 @@ LIMIT 10;`
   return (
     <div className="flex-1 flex flex-col items-center p-6 gap-6 overflow-y-auto">
       <div className="w-full max-w-4xl mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+            Transforme suas perguntas em consultas SQL poderosas
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Use linguagem natural para criar, otimizar e entender consultas SQL de forma simples e rápida
+          </p>
+        </div>
         <Card className="shadow-md">
           <CardContent className="pt-6">
             <div className="space-y-2">
