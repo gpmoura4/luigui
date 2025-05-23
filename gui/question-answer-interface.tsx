@@ -216,7 +216,11 @@ LIMIT 10;`
                         )}
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
+                    <DropdownMenuContent 
+                      align="start" 
+                      side="bottom"
+                      className="max-h-[200px] overflow-y-auto"
+                    >
                       {databases.map((db) => (
                         <DropdownMenuItem key={db.id} onClick={() => setSelectedDb(db)} className="cursor-pointer">
                           {db.name}
