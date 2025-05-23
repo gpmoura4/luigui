@@ -25,22 +25,30 @@ const templates = [
   {
     id: "generate",
     name: "Gerar Consulta SQL",
-    prompt: "Gere uma consulta SQL para responder a seguinte pergunta: ",
+    prompt: "",
+    title: "Faça sua pergunta",
+    placeholder: "Exemplo: Quais são os produtos mais vendidos?"
   },
   {
     id: "optimize",
     name: "Otimizar Consulta",
-    prompt: "Otimize a seguinte consulta SQL para melhorar o desempenho: ",
+    prompt: "",
+    title: "Otimize uma consulta SQL",
+    placeholder: "Exemplo: SELECT * FROM produtos p JOIN categorias c ON p.categoria_id = c.id WHERE p.preco > 100;"
   },
   {
     id: "explain",
     name: "Explicar Consulta",
-    prompt: "Explique em detalhes como a seguinte consulta SQL funciona: ",
+    prompt: "",
+    title: "Receba uma explicação detalhada da sua consulta",
+    placeholder: "Exemplo: SELECT nome, COUNT(*) as total FROM vendas GROUP BY nome HAVING COUNT(*) > 5;"
   },
   {
     id: "correct",
     name: "Corrigir Consulta",
-    prompt: "Corrija os erros na seguinte consulta SQL: ",
+    prompt: "",
+    title: "Corrija uma consulta SQL",
+    placeholder: "Exemplo: SELECT nome, preco FROM produtos WERE preco > 100 ORDERY BY preco;"
   },
 ]
 
@@ -170,9 +178,9 @@ LIMIT 10;`
         <Card className="shadow-md">
           <CardContent className="pt-6">
             <div className="space-y-2">
-              <h2 className="text-lg font-medium">Faça sua pergunta</h2>
+              <h2 className="text-lg font-medium">{selectedTemplate ? selectedTemplate.title : "Faça sua pergunta"}</h2>
               <Textarea
-                placeholder="Digite sua pergunta aqui... (ex: 'Quais são os 10 clientes com maior valor de compra desde janeiro de 2023?')"
+                placeholder={selectedTemplate ? selectedTemplate.placeholder : "Digite sua pergunta aqui..."}
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 className="min-h-[100px] resize-none"
