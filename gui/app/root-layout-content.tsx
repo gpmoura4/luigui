@@ -1,21 +1,21 @@
 "use client"
 
 import type React from "react"
-import { useAuth } from "@/contexts/auth-context"
+import { useAuth } from "@/contexts/AuthContext"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
 import ClientLayout from "./ClientLayout"
 import AuthLayout from "./auth-layout"
 
 export default function RootLayoutContent({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth()
+  const { user, loading } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
 
   const isAuthPage = pathname === "/login" || pathname === "/register"
 
   useEffect(() => {
-    if (!isLoading) {
+    if (!loading) {
       // Se não estiver logado e não estiver em uma página de autenticação, redirecionar para login
       if (!user && !isAuthPage) {
         router.push("/login")
@@ -26,10 +26,10 @@ export default function RootLayoutContent({ children }: { children: React.ReactN
         router.push("/")
       }
     }
-  }, [user, isLoading, router, pathname, isAuthPage])
+  }, [user, loading, router, pathname, isAuthPage])
 
   // Se estiver carregando, mostrar um indicador de carregamento
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>

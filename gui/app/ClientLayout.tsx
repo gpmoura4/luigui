@@ -9,7 +9,7 @@ import { Users, Layers, Eye, Database, ChevronLeft, ChevronRight, Plus, LogOut }
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { useAuth } from "@/contexts/auth-context"
+import { useAuth } from "@/contexts/AuthContext"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -72,7 +72,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   }
 
   // Obter as iniciais do nome do usuário
-  const getInitials = (name: string) => {
+  const getInitials = (name: string | undefined) => {
+    if (!name) return ""
     return name
       .split(" ")
       .map((n) => n[0])
@@ -163,7 +164,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between")}>
               <div className={cn("flex items-center gap-2", collapsed && "hidden")}>
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                  <AvatarFallback>{user?.name ? getInitials(user.name) : ""}</AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col">
                   <span className="text-sm font-medium truncate max-w-[140px]">{user.name}</span>
