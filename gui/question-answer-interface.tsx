@@ -3,10 +3,18 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Copy, Database, ChevronDown, ChevronUp, Code, Sparkles } from "lucide-react"
+import { Copy, Database, ChevronDown, ChevronUp, Code, Sparkles, Lock, Search } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 
@@ -67,12 +75,19 @@ export default function QuestionAnswerInterface() {
   const [sqlQuery, setSqlQuery] = useState("")
   const [isSqlOpen, setIsSqlOpen] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<(typeof templates)[0]>(templates[0])
+  
+  // Estados para o modal de senha
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
+  const [dbPassword, setDbPassword] = useState<string>("")
+  const [passwordError, setPasswordError] = useState<string>("")
+  const [tempQuestion, setTempQuestion] = useState<string>("")
+  const [searchQuery, setSearchQuery] = useState("")
 
   // Função para buscar os databases da API
   const fetchDatabases = async () => {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/databases/`, {
-        credentials: 'include', // Importante para enviar cookies
+        credentials: 'include',
       })
       
       if (!response.ok) {
@@ -82,16 +97,13 @@ export default function QuestionAnswerInterface() {
       const data = await response.json()
       setDatabases(data)
       
-      // Se houver um database ID na URL, seleciona ele
+      // Apenas seleciona um database se houver um ID específico na URL
       const dbId = searchParams.get("db")
       if (dbId) {
         const selectedDatabase = data.find((db: Database) => db.id === dbId)
         if (selectedDatabase) {
           setSelectedDb(selectedDatabase)
         }
-      } else if (data.length > 0) {
-        // Se não houver ID na URL mas houver databases, seleciona o primeiro
-        setSelectedDb(data[0])
       }
     } catch (error) {
       console.error('Error fetching databases:', error)
@@ -121,39 +133,107 @@ export default function QuestionAnswerInterface() {
     }
   }, [searchParams])
 
+  // Função para lidar com a seleção de database
+  const handleDatabaseSelect = (db: Database) => {
+    setSelectedDb(db)
+    // Limpa a senha quando troca de database
+    setDbPassword("")
+  }
+
   const handleSubmit = async () => {
-    if (!question.trim()) return
+    if (!question.trim() || !selectedDb) return
 
+    // Se for database complete e não tiver senha, abre o modal
+    if (selectedDb.type === "complete" && !dbPassword) {
+      setTempQuestion(question) // Guarda a pergunta temporariamente
+      setIsPasswordModalOpen(true)
+      return
+    }
+
+    await submitQuestion()
+  }
+
+  // Nova função para submeter a pergunta
+  const submitQuestion = async () => {
     setIsLoading(true)
+    setSqlQuery("")
+    setAnswer("")
+    setPasswordError("")
 
-    // Aqui você terá acesso ao tipo de template selecionado através de selectedTemplate?.apiValue
-    const templateType = selectedTemplate?.apiValue || "text_to_sql" // default para text_to_sql se nenhum template estiver selecionado
+    try {
+      // Obter o token CSRF primeiro
+      const csrfResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/csrf/`, {
+        method: 'GET',
+        credentials: 'include',
+      })
 
-    // Simulando uma resposta da API com SQL gerado
-    setTimeout(() => {
-      // TODO: Enviar templateType para a API quando implementar a chamada real
-      console.log("Template type to be sent to API:", templateType)
+      let csrfToken = null
+      if (csrfResponse.ok) {
+        const cookies = document.cookie.split(';')
+        const csrfCookie = cookies.find(cookie => cookie.trim().startsWith('csrftoken='))
+        if (csrfCookie) {
+          csrfToken = csrfCookie.split('=')[1]
+        }
+      }
 
-      // Exemplo de SQL que seria gerado baseado na pergunta
-      const generatedSql = `SELECT 
-  c.customer_name,
-  SUM(o.total_amount) as total_purchases
-FROM ${selectedDb?.name.toLowerCase().replace(" ", "_")}.customers c
-JOIN ${selectedDb?.name.toLowerCase().replace(" ", "_")}.orders o
-  ON c.customer_id = o.customer_id
-WHERE o.purchase_date > '2023-01-01'
-GROUP BY c.customer_id, c.customer_name
-ORDER BY total_purchases DESC
-LIMIT 10;`
+      // Fazer a requisição principal com o token CSRF
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/databases/${selectedDb!.id}/question`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          question: question,
+          prompt_type: selectedTemplate.apiValue,
+          db_password: selectedDb!.type === "complete" ? dbPassword : undefined
+        }),
+      })
 
-      setSqlQuery(generatedSql)
+      if (!response.ok) {
+        const errorData = await response.json()
+        console.error('Error response:', errorData)
 
-      setAnswer(
-        `Com base na sua pergunta: "${question}" consultando o banco de dados "${selectedDb?.name}"\n\nEncontrei os 10 clientes com as maiores compras desde janeiro de 2023. O cliente João Silva lidera com R$15.750 em compras, seguido por Maria Oliveira com R$12.320. A média de compras destes clientes é de R$8.940.\n\nOs dados completos estão disponíveis na tabela abaixo.`,
-      )
+        if (response.status === 403) {
+          throw new Error("Erro de autorização. Por favor, verifique se você está logado e tem permissão para acessar este recurso.")
+        }
+
+        if (errorData.ERROR === "db_password password not provided" || errorData.ERROR?.includes("password")) {
+          setPasswordError("Senha incorreta ou não fornecida. Por favor, tente novamente.")
+          if (selectedDb?.type === "complete") {
+            setIsPasswordModalOpen(true)
+            return
+          }
+        }
+
+        throw new Error(errorData.ERROR || errorData.detail || 'Erro ao processar sua pergunta')
+      }
+
+      const data = await response.json()
+      setAnswer(data.answer)
+      setSqlQuery(data.query)
+      setIsSqlOpen(true)
+    } catch (error) {
+      console.error('Error getting answer:', error)
+      if (error instanceof Error) {
+        setAnswer(error.message)
+      } else {
+        setAnswer("Ocorreu um erro ao processar sua pergunta. Por favor, tente novamente.")
+      }
+    } finally {
       setIsLoading(false)
-      setIsSqlOpen(true) // Mostrar SQL automaticamente na primeira resposta
-    }, 1000)
+    }
+  }
+
+  // Handler para o submit do modal de senha
+  const handlePasswordSubmit = async () => {
+    if (!dbPassword.trim()) {
+      setPasswordError("Por favor, insira a senha do banco de dados.")
+      return
+    }
+    setIsPasswordModalOpen(false)
+    await submitQuestion()
   }
 
   // Função para copiar texto para a área de transferência
@@ -174,6 +254,46 @@ LIMIT 10;`
     setQuestion(template.prompt)
   }
 
+  // Função para filtrar databases baseado na pesquisa
+  const filteredDatabases = databases.filter(db => 
+    db.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  // Componente de lista de databases
+  const DatabasesList = ({ onSelect }: { onSelect: (db: Database) => void }) => (
+    <>
+      <div className="relative">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Pesquisar banco de dados..."
+          className="pl-8"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+      <div className="mt-2">
+        {filteredDatabases.length > 0 ? (
+          filteredDatabases.map((db) => (
+            <DropdownMenuItem key={db.id} onClick={() => onSelect(db)} className="cursor-pointer">
+              <div className="flex items-center gap-2">
+                {db.name}
+                {db.type === "complete" && <Lock className="h-3 w-3 text-muted-foreground" />}
+              </div>
+            </DropdownMenuItem>
+          ))
+        ) : (
+          <div className="text-center py-2 text-sm text-muted-foreground">
+            {databases.length === 0 ? (
+              "Nenhum banco cadastrado"
+            ) : (
+              "Nenhum banco encontrado"
+            )}
+          </div>
+        )}
+      </div>
+    </>
+  )
+
   return (
     <div className="flex-1 flex flex-col items-center p-6 gap-6 overflow-y-auto">
       <div className="w-full max-w-4xl mx-auto">
@@ -191,83 +311,109 @@ LIMIT 10;`
             </p>
           </div>
         </div>
+
         <Card className="shadow-md">
           <CardContent className="pt-6">
-            <div className="space-y-2">
-              <h2 className="text-lg font-medium">{selectedTemplate ? selectedTemplate.title : "Faça sua pergunta"}</h2>
-              <Textarea
-                placeholder={selectedTemplate ? selectedTemplate.placeholder : "Digite sua pergunta aqui..."}
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                className="min-h-[100px] resize-none"
-              />
-              <div className="flex justify-between items-center gap-4">
-                <div className="flex gap-2">
+            <div className="space-y-4">
+              {!selectedDb && (
+                <div className="flex flex-col items-center justify-center p-6 text-center border-2 border-dashed rounded-lg border-muted-foreground/20">
+                  <Database className="h-8 w-8 text-muted-foreground mb-2" />
+                  <h3 className="font-medium text-lg mb-1">Selecione um Banco de Dados</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Para começar, escolha um banco de dados para fazer suas consultas
+                  </p>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="outline" className="gap-2" disabled={isLoadingDatabases}>
                         <Database className="h-4 w-4" />
-                        {isLoadingDatabases ? (
-                          "Carregando..."
-                        ) : selectedDb ? (
-                          selectedDb.name
-                        ) : (
-                          "Selecione um banco"
-                        )}
+                        {isLoadingDatabases ? "Carregando..." : "Selecionar Banco de Dados"}
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent 
-                      align="start" 
-                      side="bottom"
-                      className="max-h-[200px] overflow-y-auto"
-                    >
-                      {databases.map((db) => (
-                        <DropdownMenuItem key={db.id} onClick={() => setSelectedDb(db)} className="cursor-pointer">
-                          {db.name}
-                        </DropdownMenuItem>
-                      ))}
-                      <DropdownMenuItem asChild className="cursor-pointer text-primary">
-                        <Link href="/databases" className="w-full">
+                    <DropdownMenuContent align="center" className="w-[300px]">
+                      <div className="p-2">
+                        <DatabasesList onSelect={handleDatabaseSelect} />
+                      </div>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link href="/databases" className="w-full cursor-pointer text-primary">
                           Gerenciar bancos de dados
                         </Link>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="gap-2">
-                        <Sparkles className="h-4 w-4" />
-                        {selectedTemplate ? selectedTemplate.name : "Escolher Template"}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      {templates.map((template) => (
-                        <DropdownMenuItem
-                          key={template.id}
-                          onClick={() => applyTemplate(template)}
-                          className="cursor-pointer"
-                        >
-                          {template.name}
-                        </DropdownMenuItem>
-                      ))}
-                      <DropdownMenuItem asChild className="cursor-pointer text-primary">
-                        <Link href="/templates" className="w-full">
-                          Ver todos os templates
-                        </Link>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </div>
+              )}
 
-                <Button 
-                  onClick={handleSubmit} 
-                  disabled={!question.trim() || isLoading || !selectedDb} 
-                  className="px-8"
-                >
-                  {isLoading ? "Processando..." : "Enviar"}
-                </Button>
-              </div>
+              {selectedDb && (
+                <>
+                  <h2 className="text-lg font-medium">{selectedTemplate ? selectedTemplate.title : "Faça sua pergunta"}</h2>
+                  <Textarea
+                    placeholder={selectedTemplate ? selectedTemplate.placeholder : "Digite sua pergunta aqui..."}
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    className="min-h-[100px] resize-none"
+                  />
+                  <div className="flex justify-between items-center gap-4">
+                    <div className="flex gap-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="gap-2">
+                            <Database className="h-4 w-4" />
+                            <div className="flex items-center gap-2">
+                              {selectedDb.name}
+                              {selectedDb.type === "complete" && <Lock className="h-3 w-3 text-muted-foreground" />}
+                            </div>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" side="bottom" className="w-[300px]">
+                          <div className="p-2">
+                            <DatabasesList onSelect={handleDatabaseSelect} />
+                          </div>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem asChild className="cursor-pointer text-primary">
+                            <Link href="/databases" className="w-full">
+                              Gerenciar bancos de dados
+                            </Link>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="gap-2">
+                            <Sparkles className="h-4 w-4" />
+                            {selectedTemplate.name}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          {templates.map((template) => (
+                            <DropdownMenuItem
+                              key={template.id}
+                              onClick={() => applyTemplate(template)}
+                              className="cursor-pointer"
+                            >
+                              {template.name}
+                            </DropdownMenuItem>
+                          ))}
+                          <DropdownMenuItem asChild className="cursor-pointer text-primary">
+                            <Link href="/templates" className="w-full">
+                              Ver todos os templates
+                            </Link>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+
+                    <Button 
+                      onClick={handleSubmit} 
+                      disabled={!question.trim() || isLoading} 
+                      className="px-8"
+                    >
+                      {isLoading ? "Processando..." : "Enviar"}
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -324,6 +470,43 @@ LIMIT 10;`
             </CardContent>
           </Card>
         )}
+
+        {/* Modal de Senha do Database */}
+        <Dialog open={isPasswordModalOpen} onOpenChange={setIsPasswordModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Senha do Banco de Dados</DialogTitle>
+              <DialogDescription>
+                Digite a senha para conectar ao banco de dados {selectedDb?.name}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Input
+                  type="password"
+                  placeholder="Digite a senha do banco de dados"
+                  value={dbPassword}
+                  onChange={(e) => setDbPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handlePasswordSubmit()}
+                />
+                {passwordError && (
+                  <p className="text-sm text-red-500">{passwordError}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setIsPasswordModalOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={handlePasswordSubmit}>
+                Confirmar
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )
