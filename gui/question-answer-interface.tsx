@@ -181,6 +181,7 @@ export default function QuestionAnswerInterface() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
           ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
         },
         credentials: 'include',
@@ -191,15 +192,27 @@ export default function QuestionAnswerInterface() {
         }),
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        console.error('Error response:', errorData)
+      let data
+      try {
+        data = await response.json()
+      } catch (e) {
+        // Se não conseguir fazer parse do JSON, tenta pegar o texto
+        const errorText = await response.text()
+        throw new Error(
+          `Erro do servidor: ${response.status} - ${
+            errorText.length > 100 ? 
+            'Erro interno do servidor. Por favor, tente novamente mais tarde.' : 
+            errorText
+          }`
+        )
+      }
 
+      if (!response.ok) {
         if (response.status === 403) {
           throw new Error("Erro de autorização. Por favor, verifique se você está logado e tem permissão para acessar este recurso.")
         }
 
-        if (errorData.ERROR === "db_password password not provided" || errorData.ERROR?.includes("password")) {
+        if (data.ERROR === "db_password password not provided" || (data.ERROR && data.ERROR.includes("password"))) {
           setPasswordError("Senha incorreta ou não fornecida. Por favor, tente novamente.")
           if (selectedDb?.type === "complete") {
             setIsPasswordModalOpen(true)
@@ -207,17 +220,21 @@ export default function QuestionAnswerInterface() {
           }
         }
 
-        throw new Error(errorData.ERROR || errorData.detail || 'Erro ao processar sua pergunta')
+        throw new Error(data.ERROR || data.detail || data.natural_language_response || 'Erro ao processar sua pergunta')
       }
 
-      const data = await response.json()
-      setAnswer(data.answer)
-      setSqlQuery(data.query)
+      // Validar a estrutura da resposta
+      if (!data.natural_language_response && !data.answer) {
+        throw new Error('Resposta inválida do servidor')
+      }
+
+      setAnswer(data.natural_language_response || data.answer)
+      setSqlQuery(data.sql_query || data.query || '')
       setIsSqlOpen(true)
     } catch (error) {
       console.error('Error getting answer:', error)
       if (error instanceof Error) {
-        setAnswer(error.message)
+        setAnswer(`${error.message}`)
       } else {
         setAnswer("Ocorreu um erro ao processar sua pergunta. Por favor, tente novamente.")
       }

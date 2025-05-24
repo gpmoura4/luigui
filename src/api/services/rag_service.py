@@ -248,7 +248,7 @@ class OpenAISQLGenerator:
             "content": str(self.prompt_strategy.create_prompt(kwargs))
         }
         print("\n\n\nPROMPT: \n", str(self.prompt_strategy.create_prompt(kwargs)))
-        # 2. Função “simulada” para structured output
+        # 2. Função "simulada" para structured output
         func_def = {
             "name": self.prompt_strategy.function_name(),
             "description": f"Structured output for {self.prompt_strategy.function_name()}",
@@ -772,51 +772,70 @@ async def starts_workflow(
         have_obj_index: bool,
         prompt_type: str
         ) -> schemas.SynthesisResult:
-    engine = create_engine(f"postgresql://{cnt_str.username}:{cnt_str.password}@{cnt_str.host}:{cnt_str.port}/{cnt_str.name}")
-    sql_database = SQLDatabase(engine)
+    try:
+        engine = create_engine(f"postgresql://{cnt_str.username}:{cnt_str.password}@{cnt_str.host}:{cnt_str.port}/{cnt_str.name}")
+        sql_database = SQLDatabase(engine)
 
-    if prompt_type == "text_to_sql":
-        prompt_strategy=TextToSQLPromptStrategy("postgresql")
-    if prompt_type == "optimize_sql":
-        prompt_strategy=OptimizesSQLQueryPromptStrategy("postgresql")
-    if prompt_type == "explain_sql":
-        prompt_strategy=ExplainSQLQueryPromptStrategy("postgresql")
-    if prompt_type == "fix_sql":
-        prompt_strategy=FixSQLQueryPromptStrategy("postgresql")
+        if prompt_type == "text_to_sql":
+            prompt_strategy=TextToSQLPromptStrategy("postgresql")
+        if prompt_type == "optimize_sql":
+            prompt_strategy=OptimizesSQLQueryPromptStrategy("postgresql")
+        if prompt_type == "explain_sql":
+            prompt_strategy=ExplainSQLQueryPromptStrategy("postgresql")
+        if prompt_type == "fix_sql":
+            prompt_strategy=FixSQLQueryPromptStrategy("postgresql")
 
-    llm = LLMFactory.create_llm("gpt-4o")
+        llm = LLMFactory.create_llm("gpt-4o")
 
-    sql_generator = OpenAISQLGenerator(
-        llm=llm,
-        prompt_strategy=prompt_strategy
-    )
+        sql_generator = OpenAISQLGenerator(
+            llm=llm,
+            prompt_strategy=prompt_strategy
+        )
 
-    obj_retriever = SQLTableRetriever(
-        cnt_str=cnt_str,
-        sql_generator=sql_generator,
-        tables=tables,
-        have_obj_index=have_obj_index
-    )
+        obj_retriever = SQLTableRetriever(
+            cnt_str=cnt_str,
+            sql_generator=sql_generator,
+            tables=tables,
+            have_obj_index=have_obj_index
+        )
 
-    sql_run_query = SQLRunQuery(
-        sql_database=sql_database
-    )
+        sql_run_query = SQLRunQuery(
+            sql_database=sql_database
+        )
 
-    txt_tosql_workflow = TextToSQLWorkflow(
-        obj_retriever=obj_retriever,
-        sql_run_query=sql_run_query,
-        sql_generator=sql_generator,
-        sql_database=sql_database,
-        prompt_type=prompt_type
-    )
+        txt_tosql_workflow = TextToSQLWorkflow(
+            obj_retriever=obj_retriever,
+            sql_run_query=sql_run_query,
+            sql_generator=sql_generator,
+            sql_database=sql_database,
+            prompt_type=prompt_type
+        )
 
-    print("txt_tosql_workflow", txt_tosql_workflow)
-
-    response = await txt_tosql_workflow.run(
-        query=user_question,
-        timeout=30
-    )
-    return response
+        try:
+            response = await txt_tosql_workflow.run(
+                query=user_question,
+                timeout=30
+            )
+            return response
+        except Exception as e:
+            error_msg = str(e)
+            if "relation" in error_msg and "does not exist" in error_msg:
+                # Extrai o nome da tabela do erro
+                table_name = error_msg.split('"')[1] if '"' in error_msg else error_msg.split("relation ")[1].split(" ")[0]
+                return schemas.SynthesisResult(
+                    natural_language_response=f"Desculpe, mas a tabela '{table_name}' não existe no banco de dados. Por favor, verifique o nome da tabela e tente novamente. As tabelas disponíveis são: {', '.join(tables)}",
+                    sql_query=""
+                )
+            else:
+                return schemas.SynthesisResult(
+                    natural_language_response=f"Ocorreu um erro ao executar a consulta: {error_msg}",
+                    sql_query=""
+                )
+    except Exception as e:
+        return schemas.SynthesisResult(
+            natural_language_response=f"Erro ao processar sua pergunta: {str(e)}",
+            sql_query=""
+        )
 
 async def starts_simple_workflow(
         user_question: str, 
