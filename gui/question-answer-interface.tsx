@@ -219,18 +219,33 @@ export default function QuestionAnswerInterface() {
             return
           }
         }
-
+        console.log("data.ERROR", data.ERROR)
+        console.log("data.detail", data.detail)
+        console.log("data.natural_language_response", data.natural_language_response)
+        
+        
         throw new Error(data.ERROR || data.detail || data.natural_language_response || 'Erro ao processar sua pergunta')
+
       }
 
       // Validar a estrutura da resposta
-      if (!data.natural_language_response && !data.answer) {
+      if (!data.natural_language_response && !data.answer && !data.sql_query && !data.query) {
         throw new Error('Resposta inválida do servidor')
       }
 
-      setAnswer(data.natural_language_response || data.answer)
-      setSqlQuery(data.sql_query || data.query || '')
+      // Para bancos minimal, a resposta pode ser apenas a query SQL
+      const sqlQueryText = data.sql_query || data.query || ""
+      setSqlQuery(sqlQueryText)
       setIsSqlOpen(true)
+
+      // Se for banco minimal e tivermos apenas a query, usamos ela como resposta
+      if (selectedDb?.type === "minimal" && sqlQueryText && !data.natural_language_response && !data.answer) {
+        setAnswer(sqlQueryText)
+      } else {
+        // Caso contrário, usamos a resposta em linguagem natural se disponível
+        const responseText = data.natural_language_response || data.answer || ""
+        setAnswer(responseText)
+      }
     } catch (error) {
       console.error('Error getting answer:', error)
       if (error instanceof Error) {
