@@ -238,11 +238,11 @@ export default function QuestionAnswerInterface() {
       setSqlQuery(sqlQueryText)
       setIsSqlOpen(true)
 
-      // Se for banco minimal e tivermos apenas a query, usamos ela como resposta
-      if (selectedDb?.type === "minimal" && sqlQueryText && !data.natural_language_response && !data.answer) {
-        setAnswer(sqlQueryText)
+      // Se for banco minimal E template text-to-sql, não exibimos a query como resposta em linguagem natural
+      if (selectedDb?.type === "minimal" && selectedTemplate.apiValue === "text_to_sql") {
+        setAnswer("") // Não exibe resposta em linguagem natural
       } else {
-        // Caso contrário, usamos a resposta em linguagem natural se disponível
+        // Para todos os outros casos, usamos a resposta em linguagem natural se disponível
         const responseText = data.natural_language_response || data.answer || ""
         setAnswer(responseText)
       }
@@ -450,23 +450,25 @@ export default function QuestionAnswerInterface() {
           </CardContent>
         </Card>
 
-        {answer && (
+        {(answer || sqlQuery) && (
           <Card className="mt-6 shadow-md">
             <CardContent className="pt-6">
               <div className="space-y-4">
                 {/* Resposta em linguagem natural com ícone de cópia no canto superior direito */}
-                <div className="relative p-4 bg-muted/50 rounded-lg min-h-[150px]">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 h-8 w-8"
-                    title="Copiar resposta"
-                    onClick={() => copyToClipboard(answer)}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <p className="text-sm whitespace-pre-wrap pr-10">{answer}</p>
-                </div>
+                {answer && (
+                  <div className="relative p-4 bg-muted/50 rounded-lg min-h-[150px]">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 right-2 h-8 w-8"
+                      title="Copiar resposta"
+                      onClick={() => copyToClipboard(answer)}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <p className="text-sm whitespace-pre-wrap pr-10">{answer}</p>
+                  </div>
+                )}
 
                 {/* SQL Query colapsável */}
                 {sqlQuery && (
