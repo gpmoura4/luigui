@@ -15,38 +15,37 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import { Copy, ArrowLeft, ArrowRight, Database, FileCode } from "lucide-react"
+import { createDatabase } from "@/services/database"
+import { useToast } from "@/components/ui/use-toast"
 
 interface DatabaseFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onDatabaseChange?: () => void
   database?: {
     id: string
     name: string
-    connectionType: "direct" | "schema"
-    connectionDetails?: {
-      host: string
-      port: string
-      username: string
-      password: string
-      databaseName: string
-    }
-    schema?: string
+    type: "complete" | "minimal"
+    host?: string
+    port?: string
+    username?: string
+    db_name?: string
+    schemas?: string
   }
 }
 
-export function DatabaseFormDialog({ open, onOpenChange, database }: DatabaseFormDialogProps) {
-  // Estado para controlar a etapa atual do formulário
+export function DatabaseFormDialog({ open, onOpenChange, onDatabaseChange, database }: DatabaseFormDialogProps) {
+  const { toast } = useToast()
   const [step, setStep] = useState(1)
-
-  // Estados para os campos do formulário
   const [name, setName] = useState(database?.name || "")
-  const [connectionType, setConnectionType] = useState<"direct" | "schema">(database?.connectionType || "direct")
-  const [host, setHost] = useState(database?.connectionDetails?.host || "")
-  const [port, setPort] = useState(database?.connectionDetails?.port || "")
-  const [username, setUsername] = useState(database?.connectionDetails?.username || "")
-  const [password, setPassword] = useState(database?.connectionDetails?.password || "")
-  const [databaseName, setDatabaseName] = useState(database?.connectionDetails?.databaseName || "")
-  const [schema, setSchema] = useState(database?.schema || "")
+  const [connectionType, setConnectionType] = useState<"direct" | "schema">(
+    database?.type === "complete" ? "direct" : "schema"
+  )
+  const [host, setHost] = useState(database?.host || "")
+  const [port, setPort] = useState(database?.port || "")
+  const [username, setUsername] = useState(database?.username || "")
+  const [password, setPassword] = useState("")
+  const [schema, setSchema] = useState(database?.schemas || "")
 
   // Script de extração de esquema
   const schemaExtractionScript = `SELECT json_agg(
@@ -90,28 +89,47 @@ WHERE table_schema NOT IN ('information_schema', 'pg_catalog', 'pg_toast');`
   }
 
   // Função para salvar o banco de dados
-  const handleSave = () => {
-    // Aqui você implementaria a lógica para salvar o banco de dados
-    const databaseData = {
-      name,
-      connectionType,
-      ...(connectionType === "direct"
-        ? {
-            connectionDetails: {
+  const handleSave = async () => {
+    try {
+      console.log("Preparing data to save...")
+      
+      const databaseData = {
+        name,
+        type: connectionType === "direct" ? "complete" as const : "minimal" as const,
+        ...(connectionType === "direct"
+          ? {
               host,
               port,
               username,
               password,
-              databaseName,
-            },
-          }
-        : {
-            schema,
-          }),
-    }
+              db_name: name,
+            }
+          : {
+              host: null,
+              port: null,
+              username: null,
+              db_name: null,
+              schemas: schema,
+            }),
+      }
 
-    console.log("Salvando banco de dados:", databaseData)
-    handleClose()
+      console.log("Database data to be sent:", databaseData)
+      
+      await createDatabase(databaseData)
+      toast({
+        title: "Sucesso!",
+        description: "Banco de dados criado com sucesso.",
+      })
+      onDatabaseChange?.()
+      handleClose()
+    } catch (error) {
+      console.error("Error saving database:", error)
+      toast({
+        title: "Erro!",
+        description: error instanceof Error ? error.message : "Erro ao criar banco de dados. Tente novamente.",
+        variant: "destructive",
+      })
+    }
   }
 
   // Verificar se o botão "Próximo" deve estar desabilitado
@@ -119,7 +137,7 @@ WHERE table_schema NOT IN ('information_schema', 'pg_catalog', 'pg_toast');`
     if (step === 1) return !name.trim()
     if (step === 2) return !connectionType
     if (step === 3 && connectionType === "direct") {
-      return !host.trim() || !port.trim() || !username.trim() || !databaseName.trim()
+      return !host.trim() || !port.trim() || !username.trim()
     }
     if (step === 3 && connectionType === "schema") {
       return !schema.trim()
@@ -249,16 +267,6 @@ WHERE table_schema NOT IN ('information_schema', 'pg_catalog', 'pg_toast');`
                 <p className="text-xs text-muted-foreground">
                   A senha é armazenada de forma segura e nunca é compartilhada.
                 </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="databaseName">Nome do Banco de Dados</Label>
-                <Input
-                  id="databaseName"
-                  value={databaseName}
-                  onChange={(e) => setDatabaseName(e.target.value)}
-                  placeholder="Ex: postgres"
-                  required
-                />
               </div>
             </div>
           )}

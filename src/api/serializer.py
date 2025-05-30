@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from api.models import Database, Table,QuestionAnswer
+from api.models import Database, Table,QuestionAnswer, UserProfile
 from django.contrib.auth.models import User
 
 
@@ -83,3 +83,23 @@ class QuestionAnswerSerializer(serializers.ModelSerializer):
             "answer": {"read_only": True},
             "query": {"read_only": True},
         }
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ('role',)
+
+class UserRegistrationSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+    role = serializers.ChoiceField(choices=UserProfile.ROLE_CHOICES, default='employee')
+    
+    class Meta:
+        model = User
+        fields = ('username', 'password', 'email', 'first_name', 'last_name', 'role')
+    
+    def create(self, validated_data):
+        role = validated_data.pop('role')
+        user = User.objects.create_user(**validated_data)
+        user.profile.role = role
+        user.profile.save()
+        return user

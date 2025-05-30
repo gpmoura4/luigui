@@ -1,66 +1,72 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
-import { Database, Edit, Plus, FileCode } from "lucide-react"
+import { Database, Edit, Plus, FileCode, Search } from "lucide-react"
 import Link from "next/link"
 import { DatabaseFormDialog } from "@/components/database-form-dialog"
 import { ProtectedRoute } from "@/components/protected-route"
+import { API_BASE_URL } from "@/config/constants"
+import { Input } from "@/components/ui/input"
 
-// Dados de exemplo para demonstração
-const sampleDatabases = [
-  {
-    id: "db1",
-    name: "Vendas",
-    connectionType: "direct" as const,
-    connectionDetails: {
-      host: "localhost",
-      port: "5432",
-      username: "postgres",
-      password: "****",
-      databaseName: "vendas",
-    },
-  },
-  {
-    id: "db2",
-    name: "Recursos Humanos",
-    connectionType: "direct" as const,
-    connectionDetails: {
-      host: "db.example.com",
-      port: "5432",
-      username: "admin",
-      password: "****",
-      databaseName: "rh",
-    },
-  },
-  {
-    id: "db3",
-    name: "Inventário",
-    connectionType: "schema" as const,
-    schema: "{ ... schema data ... }",
-  },
-  {
-    id: "db4",
-    name: "Financeiro",
-    connectionType: "schema" as const,
-    schema: "{ ... schema data ... }",
-  },
-]
+interface DatabaseType {
+  id: string
+  name: string
+  type: "complete" | "minimal"
+  host?: string
+  port?: string
+  username?: string
+  db_name?: string
+}
 
 export default function DatabasesPage() {
-  const [databases, setDatabases] = useState(sampleDatabases)
+  const [databases, setDatabases] = useState<DatabaseType[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [selectedDatabase, setSelectedDatabase] = useState<(typeof sampleDatabases)[0] | undefined>(undefined)
+  const [selectedDatabase, setSelectedDatabase] = useState<DatabaseType | undefined>(undefined)
+  const [isLoading, setIsLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
+
+  const fetchDatabases = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/databases/`, {
+        credentials: "include",
+      })
+      if (!response.ok) throw new Error("Failed to fetch databases")
+      const data = await response.json()
+      setDatabases(data)
+    } catch (error) {
+      console.error("Error fetching databases:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchDatabases()
+  }, [])
 
   const handleNewDatabase = () => {
     setSelectedDatabase(undefined)
     setIsDialogOpen(true)
   }
 
-  const handleEditDatabase = (database: (typeof sampleDatabases)[0]) => {
+  const handleEditDatabase = (database: DatabaseType) => {
     setSelectedDatabase(database)
     setIsDialogOpen(true)
+  }
+
+  const handleDatabaseChange = () => {
+    fetchDatabases()
+  }
+
+  // Filtra os databases baseado na busca
+  const filteredDatabases = databases.filter(db =>
+    db.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  if (isLoading) {
+    return <div>Carregando...</div>
   }
 
   return (
@@ -75,46 +81,72 @@ export default function DatabasesPage() {
             </p>
           </div>
 
-          {/* Seção de call-to-action e botão New Database */}
-          <div className="bg-muted/30 rounded-lg p-6 mb-8 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div>
-              <h2 className="text-lg font-medium mb-1">Registre um novo banco de dados</h2>
-              <p className="text-muted-foreground max-w-xl">
-                Conecte seu banco de dados para começar a fazer consultas em linguagem natural. Suportamos PostgreSQL,
-                MySQL, SQL Server e outros.
-              </p>
+          {/* Seção de busca e botão New Database */}
+          <div className="bg-muted/30 rounded-lg p-6 mb-8">
+            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
+              <div className="flex-1">
+                <h2 className="text-lg font-medium mb-1">Registre um novo banco de dados</h2>
+                <p className="text-muted-foreground max-w-xl">
+                  Conecte seu banco de dados para começar a fazer consultas em linguagem natural. Suportamos PostgreSQL,
+                  MySQL, SQL Server e outros.
+                </p>
+              </div>
+              <Button className="gap-2 whitespace-nowrap" size="lg" onClick={handleNewDatabase}>
+                <Plus className="h-4 w-4" />
+                Novo Banco de Dados
+              </Button>
             </div>
-            <Button className="gap-2 whitespace-nowrap" size="lg" onClick={handleNewDatabase}>
-              <Plus className="h-4 w-4" />
-              Novo Banco de Dados
-            </Button>
+            
+            {/* Campo de busca */}
+            <div className="mt-4 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar banco de dados por nome..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
 
           {/* Grid de cards de bancos de dados */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {databases.map((db) => (
+            {filteredDatabases.map((db) => (
               <DatabaseCard key={db.id} database={db} onEdit={() => handleEditDatabase(db)} />
             ))}
           </div>
 
           {/* Mensagem para quando não há bancos de dados */}
-          {databases.length === 0 && (
+          {filteredDatabases.length === 0 && (
             <div className="text-center py-12">
               <Database className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">Nenhum banco de dados registrado</h3>
+              <h3 className="text-lg font-medium mb-2">
+                {searchQuery
+                  ? "Nenhum banco de dados encontrado para sua busca"
+                  : "Nenhum banco de dados registrado"}
+              </h3>
               <p className="text-muted-foreground mb-4">
-                Registre seu primeiro banco de dados para começar a fazer consultas.
+                {searchQuery
+                  ? "Tente buscar com outros termos"
+                  : "Registre seu primeiro banco de dados para começar a fazer consultas."}
               </p>
-              <Button className="gap-2" onClick={handleNewDatabase}>
-                <Plus className="h-4 w-4" />
-                Novo Banco de Dados
-              </Button>
+              {!searchQuery && (
+                <Button className="gap-2" onClick={handleNewDatabase}>
+                  <Plus className="h-4 w-4" />
+                  Novo Banco de Dados
+                </Button>
+              )}
             </div>
           )}
         </div>
 
         {/* Modal de formulário */}
-        <DatabaseFormDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} database={selectedDatabase} />
+        <DatabaseFormDialog 
+          open={isDialogOpen} 
+          onOpenChange={setIsDialogOpen} 
+          database={selectedDatabase}
+          onDatabaseChange={handleDatabaseChange}
+        />
       </div>
     </ProtectedRoute>
   )
@@ -125,19 +157,7 @@ function DatabaseCard({
   database,
   onEdit,
 }: {
-  database: {
-    id: string
-    name: string
-    connectionType: "direct" | "schema"
-    connectionDetails?: {
-      host: string
-      port: string
-      username: string
-      password: string
-      databaseName: string
-    }
-    schema?: string
-  }
+  database: DatabaseType
   onEdit: () => void
 }) {
   return (
@@ -147,7 +167,7 @@ function DatabaseCard({
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                {database.connectionType === "direct" ? (
+                {database.type === "complete" ? (
                   <Database className="h-5 w-5 text-primary" />
                 ) : (
                   <FileCode className="h-5 w-5 text-primary" />
@@ -156,7 +176,7 @@ function DatabaseCard({
               <div>
                 <h3 className="font-medium">{database.name}</h3>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {database.connectionType === "direct" ? "Conexão Direta" : "Esquema Fornecido"}
+                  {database.type === "complete" ? "Conexão Direta" : "Esquema Fornecido"}
                 </p>
               </div>
             </div>
@@ -164,12 +184,12 @@ function DatabaseCard({
               <Edit className="h-4 w-4" />
             </Button>
           </div>
-          {database.connectionType === "direct" && database.connectionDetails && (
+          {database.type === "complete" && (
             <p className="text-xs text-muted-foreground mt-4 font-mono truncate">
-              {`${database.connectionDetails.username}@${database.connectionDetails.host}:${database.connectionDetails.port}/${database.connectionDetails.databaseName}`}
+              {`${database.username}@${database.host}:${database.port}/${database.db_name}`}
             </p>
           )}
-          {database.connectionType === "schema" && (
+          {database.type === "minimal" && (
             <p className="text-xs text-muted-foreground mt-4">Esquema fornecido manualmente</p>
           )}
         </div>
