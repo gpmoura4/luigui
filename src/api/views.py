@@ -3,8 +3,11 @@ from django.http import Http404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from api.models import Database, Table, QuestionAnswer
-from api.serializer import DatabaseSerializer, TableSerializer, QuestionAnswerSerializer, UserSerializer
+from api.models import Database, Table, QuestionAnswer, UserProfile
+from api.serializer import (
+    DatabaseSerializer, TableSerializer, QuestionAnswerSerializer, 
+    UserSerializer, UserRegistrationSerializer, UserProfileSerializer
+)
 from api import schemas
 from api.services.rag_service import *
 from django.forms.models import model_to_dict
@@ -15,10 +18,57 @@ from rest_framework import permissions
 from api.permissions import IsOwner, IsOwnerTable
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.http import JsonResponse
+from rest_framework.authtoken.views import ObtainAuthToken
+from rest_framework.authtoken.models import Token
+from rest_framework.permissions import AllowAny
 
 @ensure_csrf_cookie
 def get_csrf(request):
     return JsonResponse({'detail': 'CSRF cookie set'})
+
+class CustomAuthToken(ObtainAuthToken):
+    def post(self, request, *args, **kwargs):
+        serializer = self.serializer_class(data=request.data,
+                                         context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        token, created = Token.objects.get_or_create(user=user)
+        return Response({
+            'token': token.key,
+            'user_id': user.pk,
+            'role': user.profile.role,
+            'username': user.username
+        })
+
+class UserRegistrationView(APIView):
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        serializer = UserRegistrationSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            token, created = Token.objects.get_or_create(user=user)
+            return Response({
+                'token': token.key,
+                'user_id': user.pk,
+                'role': user.profile.role,
+                'username': user.username
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class UserProfileView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        serializer = UserProfileSerializer(request.user.profile)
+        return Response(serializer.data)
+    
+    def put(self, request):
+        serializer = UserProfileSerializer(request.user.profile, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class UserList(generics.ListAPIView):
     queryset = User.objects.all()
