@@ -6,7 +6,8 @@ from rest_framework import status
 from api.models import Database, Table, QuestionAnswer, UserProfile
 from api.serializer import (
     DatabaseSerializer, TableSerializer, QuestionAnswerSerializer, 
-    UserSerializer, UserRegistrationSerializer, UserProfileSerializer
+    UserSerializer, UserRegistrationSerializer, UserProfileSerializer,
+    UserDetailSerializer
 )
 from api import schemas
 from api.services.rag_service import *
@@ -496,5 +497,12 @@ class DatabaseAccessView(APIView):
             return Response({"error": "Database not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class UserDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        serializer = UserDetailSerializer(request.user)
+        return Response(serializer.data)
 
         

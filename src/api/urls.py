@@ -7,6 +7,7 @@ urlpatterns = [
     path('auth/register/', views.UserRegistrationView.as_view(), name='user-register'),
     path('auth/login/', views.CustomAuthToken.as_view(), name='user-login'),
     path('auth/profile/', views.UserProfileView.as_view(), name='user-profile'),
+    path('auth/user/', views.UserDetailView.as_view(), name='user-detail'),
     
     # Existing endpoints
     path('users/', views.UserList.as_view()),
