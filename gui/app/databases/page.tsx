@@ -222,9 +222,19 @@ function DatabaseCard({
       </CardContent>
       <CardFooter className="bg-muted/20 px-6 py-3 flex justify-between">
         <span className="text-xs text-muted-foreground">Última consulta: há 2 horas</span>
-        <Link href={`/?db=${database.id}`} className="text-xs text-primary hover:underline">
-          Fazer consulta
-        </Link>
+        <div className="flex gap-3 items-center">
+          {isAdmin && (
+            <Link 
+              href={`/databases/${database.id}/users`} 
+              className="text-xs text-primary hover:underline"
+            >
+              Usuários
+            </Link>
+          )}
+          <Link href={`/?db=${database.id}`} className="text-xs text-primary hover:underline">
+            Fazer consulta
+          </Link>
+        </div>
       </CardFooter>
     </Card>
   )
