@@ -87,7 +87,10 @@ class DatabaseList(APIView):
     def get(self, request, format=None):
         # Alteração: Filtra os databases pelo usuário autenticado
         if request.user.is_authenticated:
-            databases = Database.objects.filter(user=request.user)
+            if request.user.profile.role == 'admin':
+                databases = Database.objects.all()
+            else:
+                databases = request.user.profile.accessible_databases.all()
         else:
             databases = Database.objects.none()  # Retorna um queryset vazio se não estiver autenticado
 
@@ -102,7 +105,9 @@ class DatabaseList(APIView):
         )
         
         if serializer.is_valid():
-            serializer.save()
+            database = serializer.save()
+            # Adiciona o database à lista de databases acessíveis do usuário
+            request.user.profile.accessible_databases.add(database)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -412,5 +417,84 @@ class QuestionAnswerList(APIView):
         serializer = QuestionAnswerSerializer(questions, many=True)
         return Response(serializer.data)
 
+class UserListWithAccess(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if request.user.profile.role != 'admin':
+            return Response({"error": "Only admins can access this endpoint"}, status=status.HTTP_403_FORBIDDEN)
+        
+        users = User.objects.all()
+        user_data = []
+        
+        for user in users:
+            # Combina os databases que o usuário criou com os que ele tem acesso
+            if user.profile.role == 'admin':
+                # Para admins, inclui todos os databases
+                database_ids = list(Database.objects.values_list('id', flat=True))
+            else:
+                # Para employees, inclui apenas os databases acessíveis
+                database_ids = list(user.profile.accessible_databases.values_list('id', flat=True))
+            
+            user_data.append({
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "role": user.profile.role,
+                "databases": database_ids
+            })
+        
+        return Response(user_data)
+
+class DatabaseAccessView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, database):
+        if request.user.profile.role != 'admin':
+            return Response({"error": "Only admins can manage database access"}, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            database_obj = Database.objects.get(id=database)
+            user_ids = request.data.get('user_ids', [])
+            
+            # Get all users with the specified IDs
+            users = User.objects.filter(id__in=user_ids)
+            
+            # Grant access to selected users
+            for user in users:
+                if user.profile.role == 'employee':
+                    user.profile.accessible_databases.add(database_obj)
+                    user.profile.save()
+            
+            return Response({"message": "Database access granted successfully"})
+            
+        except Database.DoesNotExist:
+            return Response({"error": "Database not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def delete(self, request, database):
+        if request.user.profile.role != 'admin':
+            return Response({"error": "Only admins can manage database access"}, status=status.HTTP_403_FORBIDDEN)
+        
+        try:
+            database_obj = Database.objects.get(id=database)
+            user_ids = request.data.get('user_ids', [])
+            
+            # Get all users with the specified IDs
+            users = User.objects.filter(id__in=user_ids)
+            
+            # Remove database access for each user
+            for user in users:
+                if user.profile.role == 'employee':
+                    user.profile.accessible_databases.remove(database_obj)
+                    user.profile.save()
+            
+            return Response({"message": "Database access removed successfully"})
+            
+        except Database.DoesNotExist:
+            return Response({"error": "Database not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         
