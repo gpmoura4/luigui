@@ -116,10 +116,7 @@ export default function QueriesPage() {
                       </div>
                       <div>
                         <h3 className="font-medium">{db.name}</h3>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-                          <Clock className="h-3 w-3" />
-                          <span>Última consulta: {db.lastQuery}</span>
-                        </div>
+                        
                       </div>
                     </div>
                   </CardContent>

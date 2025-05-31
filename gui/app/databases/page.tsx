@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
-import { Database, Edit, Plus, FileCode, Search } from "lucide-react"
+import { Database, Edit, Plus, FileCode, Search, Users } from "lucide-react"
 import Link from "next/link"
 import { DatabaseFormDialog } from "@/components/database-form-dialog"
 import { ProtectedRoute } from "@/components/protected-route"
@@ -185,56 +185,64 @@ function DatabaseCard({
   isAdmin: boolean
 }) {
   return (
-    <Card className="overflow-hidden transition-all hover:shadow-md">
-      <CardContent className="p-0">
+    <Card className="overflow-hidden transition-all hover:shadow-md flex flex-col">
+      <CardContent className="p-0 flex-1">
         <div className="p-6">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
                 {database.type === "complete" ? (
-                  <Database className="h-5 w-5 text-primary" />
+                  <Database className="h-6 w-6 text-primary" />
                 ) : (
-                  <FileCode className="h-5 w-5 text-primary" />
+                  <FileCode className="h-6 w-6 text-primary" />
                 )}
               </div>
               <div>
-                <h3 className="font-medium">{database.name}</h3>
-                <p className="text-xs text-muted-foreground mt-1">
+                <h3 className="text-lg font-medium">{database.name}</h3>
+                <p className="text-sm text-muted-foreground mt-1">
                   {database.type === "complete" ? "Conexão Direta" : "Esquema Fornecido"}
                 </p>
               </div>
             </div>
             {isAdmin && (
-              <Button variant="ghost" size="icon" className="h-8 w-8" title="Editar banco de dados" onClick={onEdit}>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 hover:bg-primary/10" 
+                title="Editar banco de dados" 
+                onClick={onEdit}
+              >
                 <Edit className="h-4 w-4" />
               </Button>
             )}
           </div>
-          {database.type === "complete" && (
-            <p className="text-xs text-muted-foreground mt-4 font-mono truncate">
-              {`${database.username}@${database.host}:${database.port}/${database.db_name}`}
-            </p>
-          )}
-          {database.type === "minimal" && (
-            <p className="text-xs text-muted-foreground mt-4">Esquema fornecido manualmente</p>
-          )}
         </div>
       </CardContent>
-      <CardFooter className="bg-muted/20 px-6 py-3 flex justify-between">
-        <span className="text-xs text-muted-foreground">Última consulta: há 2 horas</span>
-        <div className="flex gap-3 items-center">
-          {isAdmin && (
-            <Link 
-              href={`/databases/${database.id}/users`} 
-              className="text-xs text-primary hover:underline"
-            >
-              Usuários
+      <CardFooter className="bg-muted/10 px-6 py-4 flex justify-center items-center gap-4 border-t">
+        {isAdmin && (
+          <Button 
+            variant="outline"
+            size="sm"
+            className="gap-2 hover:bg-primary/10 min-w-[160px] justify-center"
+            asChild
+          >
+            <Link href={`/databases/${database.id}/users`}>
+              <Users className="h-4 w-4" />
+              Gerenciar Usuários
             </Link>
-          )}
-          <Link href={`/?db=${database.id}`} className="text-xs text-primary hover:underline">
-            Fazer consulta
+          </Button>
+        )}
+        <Button 
+          variant="default"
+          size="sm"
+          className="gap-2 min-w-[160px] justify-center"
+          asChild
+        >
+          <Link href={`/?db=${database.id}`}>
+            <Search className="h-4 w-4" />
+            Fazer Consulta
           </Link>
-        </div>
+        </Button>
       </CardFooter>
     </Card>
   )
