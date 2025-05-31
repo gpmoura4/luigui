@@ -28,9 +28,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   // Adicionar verificação de autenticação
   useEffect(() => {
     if (!loading) {  // Só verifica após carregar o estado de autenticação
-      if (!isAuthenticated && pathname !== '/login') {
-        router.push('/login')
-      } else if (isAuthenticated && pathname === '/login') {
+      if (!isAuthenticated && pathname !== '/auth/login') {
+        router.push('/auth/login')
+      } else if (isAuthenticated && pathname === '/auth/login') {
         router.push('/')
       }
     }
@@ -45,7 +45,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     )
   }
 
-  if (!isAuthenticated && pathname !== '/login') {
+  if (!isAuthenticated && pathname !== '/auth/login') {
     return null
   }
 
@@ -68,7 +68,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   const handleLogout = async () => {
     await logout()
-    router.push("/login")
+    router.push("/auth/login")
   }
 
   // Obter as iniciais do nome do usuário
