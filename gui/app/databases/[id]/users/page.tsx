@@ -4,13 +4,14 @@ import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { ArrowLeft, Users, Save } from "lucide-react"
+import { ArrowLeft, Users, Save, Search } from "lucide-react"
 import Link from "next/link"
 import { ProtectedRoute } from "@/components/protected-route"
 import { API_BASE_URL } from "@/config/constants"
 import { useAuth } from "@/contexts/AuthContext"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
+import { Input } from "@/components/ui/input"
 
 interface User {
   id: string
@@ -25,6 +26,7 @@ export default function DatabaseUsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
   const params = useParams()
   const router = useRouter()
   const { user } = useAuth()
@@ -146,6 +148,12 @@ export default function DatabaseUsersPage() {
   if (isLoading) {
     return <div>Carregando...</div>
   }
+
+  // Filtra os usuários com base na busca
+  const filteredUsers = users.filter(user => 
+    user.email.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
   return (
     <ProtectedRoute>        
       <div className="flex-1 flex flex-col p-6 overflow-y-auto">
@@ -173,21 +181,37 @@ export default function DatabaseUsersPage() {
             </Button>
           </div>
 
+          {/* Campo de busca */}
+          <div className="mb-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar usuário por email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
     
           {/* Lista de usuários */}
           <div className="grid gap-4">
-            {users.length === 0 ? (
+            {filteredUsers.length === 0 ? (
               <div className="text-center py-12">
                 <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium mb-2">
-                  Nenhum usuário encontrado
+                  {searchQuery 
+                    ? "Nenhum usuário encontrado para sua busca" 
+                    : "Nenhum usuário encontrado"}
                 </h3>
                 <p className="text-muted-foreground">
-                  Não há usuários do tipo "employee" cadastrados no sistema.
+                  {searchQuery 
+                    ? "Tente buscar com outros termos" 
+                    : "Não há usuários do tipo \"employee\" cadastrados no sistema."}
                 </p>
               </div>
             ) : (
-              users.map((user) => (
+              filteredUsers.map((user) => (
                 <Card key={user.id} className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
