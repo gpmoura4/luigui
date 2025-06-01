@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Copy, ArrowLeft, ArrowRight, Database, FileCode } from "lucide-react"
 import { createDatabase } from "@/services/database"
 import { useToast } from "@/components/ui/use-toast"
+import { API_BASE_URL } from "@/config/constants"
 
 interface DatabaseFormDialogProps {
   open: boolean
@@ -88,6 +89,51 @@ WHERE table_schema NOT IN ('information_schema', 'pg_catalog', 'pg_toast');`
     onOpenChange(false)
   }
 
+  function getCookie(name: string): string {
+    const value = `; ${document.cookie}`
+    const parts = value.split(`; ${name}=`)
+    if (parts.length === 2) return parts.pop()?.split(';').shift() || ''
+    return ''
+  } 
+
+  // Função para criar tabelas após criar o banco de dados
+  const createTables = async (databaseId: string, schemas: string) => {
+    try {
+      // Parse o JSON dos schemas
+      let parsedSchemas;
+      try {
+        parsedSchemas = JSON.parse(schemas);
+      } catch (e) {
+        console.error("Erro ao fazer parse dos schemas:", e);
+        throw new Error("Formato inválido dos schemas");
+      }
+
+      console.log("schemas antes do envio:", parsedSchemas);
+      
+      const response = await fetch(`${API_BASE_URL}/api/databases/${databaseId}/tables/`, {
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-CSRFToken": getCookie("csrftoken"),
+        },
+        credentials: 'include',
+        body: JSON.stringify(parsedSchemas), // Envia diretamente o objeto parseado
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error("Resposta de erro do servidor:", errorData);
+        throw new Error(errorData?.error || 'Falha ao criar tabelas');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Erro ao criar tabelas:', error);
+      throw error;
+    }
+  };
+
   // Função para salvar o banco de dados
   const handleSave = async () => {
     try {
@@ -115,11 +161,30 @@ WHERE table_schema NOT IN ('information_schema', 'pg_catalog', 'pg_toast');`
 
       console.log("Database data to be sent:", databaseData)
       
-      await createDatabase(databaseData)
-      toast({
-        title: "Sucesso!",
-        description: "Banco de dados criado com sucesso.",
-      })
+      const createdDatabase = await createDatabase(databaseData)
+      
+      // Se for do tipo minimal, cria as tabelas automaticamente
+      if (connectionType === "schema" && schema) {
+        try {
+          await createTables(createdDatabase.id, schema)
+          toast({
+            title: "Sucesso!",
+            description: "Banco de dados e tabelas criados com sucesso.",
+          })
+        } catch (error) {
+          toast({
+            title: "Atenção!",
+            description: "Banco de dados criado, mas houve um erro ao criar as tabelas.",
+            variant: "destructive",
+          })
+        }
+      } else {
+        toast({
+          title: "Sucesso!",
+          description: "Banco de dados criado com sucesso.",
+        })
+      }
+      
       onDatabaseChange?.()
       handleClose()
     } catch (error) {

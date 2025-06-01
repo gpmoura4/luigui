@@ -72,8 +72,7 @@ export default function DatabasesPage() {
   }
 
   const isAdmin = user?.role === 'admin'
-  console.log("user TODO:",user)
-  console.log("user role:",user?.role)
+
 
   return (
     <ProtectedRoute>
@@ -187,36 +186,41 @@ function DatabaseCard({
   return (
     <Card className="overflow-hidden transition-all hover:shadow-md flex flex-col">
       <CardContent className="p-0 flex-1">
-        <div className="p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                {database.type === "complete" ? (
-                  <Database className="h-6 w-6 text-primary" />
-                ) : (
-                  <FileCode className="h-6 w-6 text-primary" />
-                )}
+        <Link href={`/databases/${database.id}/tables`} className="block">
+          <div className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  {database.type === "complete" ? (
+                    <Database className="h-6 w-6 text-primary" />
+                  ) : (
+                    <FileCode className="h-6 w-6 text-primary" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium">{database.name}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {database.type === "complete" ? "Conexão Direta" : "Esquema Fornecido"}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-medium">{database.name}</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {database.type === "complete" ? "Conexão Direta" : "Esquema Fornecido"}
-                </p>
-              </div>
+              {isAdmin && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 hover:bg-primary/10" 
+                  title="Editar banco de dados" 
+                  onClick={(e) => {
+                    e.preventDefault()
+                    onEdit()
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              )}
             </div>
-            {isAdmin && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 hover:bg-primary/10" 
-                title="Editar banco de dados" 
-                onClick={onEdit}
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
-            )}
           </div>
-        </div>
+        </Link>
       </CardContent>
       <CardFooter className="bg-muted/10 px-6 py-4 flex justify-center items-center gap-4 border-t">
         {isAdmin && (
@@ -238,7 +242,7 @@ function DatabaseCard({
           className="gap-2 min-w-[160px] justify-center"
           asChild
         >
-          <Link href={`/?db=${database.id}`}>
+          <Link href={`/?template=generate&db=${database.id}`}>
             <Search className="h-4 w-4" />
             Fazer Consulta
           </Link>
