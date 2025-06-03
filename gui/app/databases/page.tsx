@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
-import { Database, Edit, Plus, FileCode, Search } from "lucide-react"
+import { Database, Edit, Plus, FileCode, Search, Users } from "lucide-react"
 import Link from "next/link"
 import { DatabaseFormDialog } from "@/components/database-form-dialog"
 import { ProtectedRoute } from "@/components/protected-route"
 import { API_BASE_URL } from "@/config/constants"
 import { Input } from "@/components/ui/input"
+import { useAuth } from "@/contexts/AuthContext"
 
 interface DatabaseType {
   id: string
@@ -26,6 +27,7 @@ export default function DatabasesPage() {
   const [selectedDatabase, setSelectedDatabase] = useState<DatabaseType | undefined>(undefined)
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const { user } = useAuth()
 
   const fetchDatabases = async () => {
     try {
@@ -69,6 +71,9 @@ export default function DatabasesPage() {
     return <div>Carregando...</div>
   }
 
+  const isAdmin = user?.role === 'admin'
+
+
   return (
     <ProtectedRoute>
       <div className="flex-1 flex flex-col p-6 overflow-y-auto">
@@ -77,7 +82,9 @@ export default function DatabasesPage() {
           <div className="mb-8">
             <h1 className="text-2xl font-bold mb-2">Bancos de Dados</h1>
             <p className="text-muted-foreground">
-              Gerencie suas conexões de banco de dados para consultas em linguagem natural.
+              {isAdmin 
+                ? "Gerencie suas conexões de banco de dados para consultas em linguagem natural."
+                : "Visualize e acesse os bancos de dados disponíveis para consultas em linguagem natural."}
             </p>
           </div>
 
@@ -85,16 +92,23 @@ export default function DatabasesPage() {
           <div className="bg-muted/30 rounded-lg p-6 mb-8">
             <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
               <div className="flex-1">
-                <h2 className="text-lg font-medium mb-1">Registre um novo banco de dados</h2>
+                <h2 className="text-lg font-medium mb-1">
+                  {isAdmin 
+                    ? "Registre um novo banco de dados"
+                    : "Acesse os bancos de dados disponíveis"}
+                </h2>
                 <p className="text-muted-foreground max-w-xl">
-                  Conecte seu banco de dados para começar a fazer consultas em linguagem natural. Suportamos PostgreSQL,
-                  MySQL, SQL Server e outros.
+                  {isAdmin 
+                    ? "Conecte seu banco de dados para começar a fazer consultas em linguagem natural. Suportamos PostgreSQL, MySQL, SQL Server e outros."
+                    : "Selecione um banco de dados para começar a fazer consultas em linguagem natural."}
                 </p>
               </div>
-              <Button className="gap-2 whitespace-nowrap" size="lg" onClick={handleNewDatabase}>
-                <Plus className="h-4 w-4" />
-                Novo Banco de Dados
-              </Button>
+              {isAdmin && (
+                <Button className="gap-2 whitespace-nowrap" size="lg" onClick={handleNewDatabase}>
+                  <Plus className="h-4 w-4" />
+                  Novo Banco de Dados
+                </Button>
+              )}
             </div>
             
             {/* Campo de busca */}
@@ -112,7 +126,12 @@ export default function DatabasesPage() {
           {/* Grid de cards de bancos de dados */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredDatabases.map((db) => (
-              <DatabaseCard key={db.id} database={db} onEdit={() => handleEditDatabase(db)} />
+              <DatabaseCard 
+                key={db.id} 
+                database={db} 
+                onEdit={() => handleEditDatabase(db)}
+                isAdmin={isAdmin}
+              />
             ))}
           </div>
 
@@ -128,9 +147,11 @@ export default function DatabasesPage() {
               <p className="text-muted-foreground mb-4">
                 {searchQuery
                   ? "Tente buscar com outros termos"
-                  : "Registre seu primeiro banco de dados para começar a fazer consultas."}
+                  : isAdmin 
+                    ? "Registre seu primeiro banco de dados para começar a fazer consultas."
+                    : "Aguarde até que um administrador registre um banco de dados."}
               </p>
-              {!searchQuery && (
+              {!searchQuery && isAdmin && (
                 <Button className="gap-2" onClick={handleNewDatabase}>
                   <Plus className="h-4 w-4" />
                   Novo Banco de Dados
@@ -156,50 +177,78 @@ export default function DatabasesPage() {
 function DatabaseCard({
   database,
   onEdit,
+  isAdmin,
 }: {
   database: DatabaseType
   onEdit: () => void
+  isAdmin: boolean
 }) {
   return (
-    <Card className="overflow-hidden transition-all hover:shadow-md">
-      <CardContent className="p-0">
-        <div className="p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                {database.type === "complete" ? (
-                  <Database className="h-5 w-5 text-primary" />
-                ) : (
-                  <FileCode className="h-5 w-5 text-primary" />
-                )}
+    <Card className="overflow-hidden transition-all hover:shadow-md flex flex-col">
+      <CardContent className="p-0 flex-1">
+        <Link href={`/databases/${database.id}/tables`} className="block">
+          <div className="p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  {database.type === "complete" ? (
+                    <Database className="h-6 w-6 text-primary" />
+                  ) : (
+                    <FileCode className="h-6 w-6 text-primary" />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium">{database.name}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {database.type === "complete" ? "Conexão Direta" : "Esquema Fornecido"}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-medium">{database.name}</h3>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {database.type === "complete" ? "Conexão Direta" : "Esquema Fornecido"}
-                </p>
-              </div>
+              {isAdmin && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 hover:bg-primary/10" 
+                  title="Editar banco de dados" 
+                  onClick={(e) => {
+                    e.preventDefault()
+                    onEdit()
+                  }}
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+              )}
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8" title="Editar banco de dados" onClick={onEdit}>
-              <Edit className="h-4 w-4" />
-            </Button>
           </div>
-          {database.type === "complete" && (
-            <p className="text-xs text-muted-foreground mt-4 font-mono truncate">
-              {`${database.username}@${database.host}:${database.port}/${database.db_name}`}
-            </p>
-          )}
-          {database.type === "minimal" && (
-            <p className="text-xs text-muted-foreground mt-4">Esquema fornecido manualmente</p>
-          )}
-        </div>
-      </CardContent>
-      <CardFooter className="bg-muted/20 px-6 py-3 flex justify-between">
-        <span className="text-xs text-muted-foreground">Última consulta: há 2 horas</span>
-        <Link href={`/?db=${database.id}`} className="text-xs text-primary hover:underline">
-          Fazer consulta
         </Link>
+      </CardContent>
+      <CardFooter className="bg-muted/10 px-6 py-4 flex justify-center items-center gap-4 border-t">
+        {isAdmin && (
+          <Button 
+            variant="outline"
+            size="sm"
+            className="gap-2 hover:bg-primary/10 min-w-[160px] justify-center"
+            asChild
+          >
+            <Link href={`/databases/${database.id}/users`}>
+              <Users className="h-4 w-4" />
+              Gerenciar Usuários
+            </Link>
+          </Button>
+        )}
+        <Button 
+          variant="default"
+          size="sm"
+          className="gap-2 min-w-[160px] justify-center"
+          asChild
+        >
+          <Link href={`/?template=generate&db=${database.id}`}>
+            <Search className="h-4 w-4" />
+            Fazer Consulta
+          </Link>
+        </Button>
       </CardFooter>
     </Card>
   )
 }
+

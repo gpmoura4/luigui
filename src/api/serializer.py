@@ -15,6 +15,14 @@ class UserSerializer(serializers.ModelSerializer):
                 ]
 
 
+class UserDetailSerializer(serializers.ModelSerializer):
+    role = serializers.CharField(source='profile.role')
+
+    class Meta:
+        model = User
+        fields = ('pk', 'username', 'email', 'first_name', 'last_name', 'role')
+
+
 class DatabaseSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)  # Não obrigatório para 'minimal'
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
