@@ -72,10 +72,50 @@ class IPromptStrategy(Protocol):
 
 class TextToSQLPromptStrategy(IPromptStrategy):
     def __init__(self, engine):
-        self.base_prompt = DEFAULT_TEXT_TO_SQL_PROMPT.partial_format(dialect=engine)
+        self.engine = engine
+        # self.base_prompt = DEFAULT_TEXT_TO_SQL_PROMPT.partial_format(dialect=engine)
+        self.base_prompt = """\
+            Given an input question, first create a syntactically correct {dialect} \
+            query to run, then look at the results of the query and return the answer. \
+            You can order the results by a relevant column to return the most \
+            interesting examples in the database.
+
+            Pay attention to use only the column names that you can see in the schema \
+            description. Be careful to not query for columns that do not exist. \
+            Pay attention to which column is in which table. Also, qualify column names \
+            with the table name when needed.
+
+            IMPORTANT NOTE: you can use specialized pgvector syntax (`<->`) to do nearest \
+            neighbors/semantic search to a given vector from an embeddings column in the table. \
+            The embeddings value for a given row typically represents the semantic meaning of that row. \
+            The vector represents an embedding representation \
+            of the question, given below. Do NOT fill in the vector values directly, but rather specify a \
+            `[query_vector]` placeholder. For instance, some select statement examples below \
+            (the name of the embeddings column is `embedding`):
+            SELECT * FROM items ORDER BY embedding <-> '[query_vector]' LIMIT 5;
+            SELECT * FROM items WHERE id != 1 ORDER BY embedding <-> (SELECT embedding FROM items WHERE id = 1) LIMIT 5;
+            SELECT * FROM items WHERE embedding <-> '[query_vector]' < 5;
+
+            You are required to use the following format, \
+            each taking one line:
+
+            Question: Question here
+            SQLQuery: SQL Query to run
+            SQLResult: Result of the SQLQuery
+            Answer (In Portuguese): Final answer here
+
+            Only use tables listed below.
+            {schema}
+
+
+            Question: {query_str}
+            SQLQuery: \
+"""
 
     def create_prompt(self, kwargs: Any) -> str:
-        return self.base_prompt.format_messages(query_str=kwargs["query"], schema=kwargs["context"])
+        return self.base_prompt.format(query_str=kwargs["query"],
+                                                 schema=kwargs["context"], 
+                                                dialect=self.engine)
 
     def function_name(self) -> str:
         return "text_to_sql"
@@ -91,7 +131,7 @@ class SchemaSummaryPromptStrategy(IPromptStrategy):
         schema_summary_prompt = (
             "Give me a short, concise summary/caption of the table in the following table schema. \n"
             "Schema Information:\n{context}\n"
-            "Answer: \n"
+            "Answer (In Portuguese): \n"
         )
         return PromptTemplate(
             schema_summary_prompt,
@@ -111,7 +151,7 @@ class OptimizesSQLQueryPromptStrategy(IPromptStrategy):
             "Schema Information:\n{context}\n"
             "Database: {database}\n" 
             "Query: {query}\n"
-            "Answer: \n"
+            "Answer (In Portuguese): \n"
         )
         return PromptTemplate(
             optimize_sql_query_prompt,
@@ -139,7 +179,7 @@ class ExplainSQLQueryPromptStrategy(IPromptStrategy):
             "Schema Information:\n{context}\n"
             "Database: {database}\n" 
             "Query: {query}\n"
-            "Explanation: \n"
+            "Explanation (In Portuguese): \n"
         )
         return PromptTemplate(
             explain_sql_query_prompt,
@@ -167,7 +207,7 @@ class FixSQLQueryPromptStrategy(IPromptStrategy):
             "Schema Information:\n{context}\n"
             "Database: {database}\n" 
             "Query: {query}\n"
-            "Answer: \n"
+            "Answer (In Portuguese): \n"
         )
         return PromptTemplate(
             optimize_sql_query_prompt,
@@ -191,7 +231,7 @@ class ResponseSynthesisPromptStrategy(IPromptStrategy):
             "Query: {query_str}\n"
             "SQL: {sql_query}\n"
             "SQL Response: {context_str}\n"
-            "Response: "
+            "Response (In Portuguese): "
         )
         return PromptTemplate(
             response_synthesis_prompt_str,

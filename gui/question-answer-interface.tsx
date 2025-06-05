@@ -327,7 +327,7 @@ export default function QuestionAnswerInterface() {
   )
 
   return (
-    <div className="flex-1 flex flex-col items-center p-6 gap-6 overflow-y-auto">
+    <div className="h-screen flex flex-col items-center p-6 gap-6 overflow-y-auto">
       <div className="w-full max-w-4xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
@@ -484,7 +484,24 @@ export default function QuestionAnswerInterface() {
                         </Button>
                       </div>
                     </CollapsibleTrigger>
+
                     <CollapsibleContent>
+                      <div className="relative p-3 bg-black text-green-400 rounded-b-md overflow-auto h-auto">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-2 right-2 h-8 w-8 text-white hover:text-white hover:bg-white/10"
+                        title="Copiar SQL"
+                        onClick={() => copyToClipboard(sqlQuery)}
+                      >
+                      <Copy className="h-4 w-4" />
+                      </Button>
+                      <pre className="text-sm pr-10 whitespace-pre-wrap break-all">{sqlQuery}</pre>
+                     </div>
+                     </CollapsibleContent>
+
+
+                    {/* <CollapsibleContent>
                       <div className="relative p-3 bg-black text-green-400 rounded-b-md overflow-x-auto">
                         <Button
                           variant="ghost"
@@ -497,7 +514,8 @@ export default function QuestionAnswerInterface() {
                         </Button>
                         <pre className="text-sm pr-10">{sqlQuery}</pre>
                       </div>
-                    </CollapsibleContent>
+                    </CollapsibleContent> */}
+
                   </Collapsible>
                 )}
               </div>
