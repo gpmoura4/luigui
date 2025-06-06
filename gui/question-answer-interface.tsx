@@ -330,7 +330,7 @@ export default function QuestionAnswerInterface() {
     <div className="h-screen flex flex-col items-center p-6 gap-6 overflow-y-auto">
       <div className="w-full max-w-4xl mx-auto">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-teal-400 bg-clip-text text-transparent">
             Transforme suas perguntas em consultas SQL poderosas
           </h1>
           <div className="flex flex-col items-center text-center gap-1 mt-2">

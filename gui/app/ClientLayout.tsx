@@ -93,7 +93,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       >
         <div className="px-4 border-b flex items-center justify-between h-14">
           <div className={cn("flex items-center gap-2", collapsed && "justify-center")}>
-            <div className="h-6 w-6 rounded-full bg-primary flex-shrink-0" />
+            <div className="h-6 w-6 rounded-full bg-gradient-to-r from-teal-400 to-primary flex-shrink-0" />
             {!collapsed && <span className="font-semibold">Luigui</span>}
           </div>
           <Button
