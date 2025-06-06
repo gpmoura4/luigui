@@ -48,6 +48,10 @@ class FixSQLResult(Event):
     fixed_sql_query: str
     fix_explanation: str
 
+class TextToSQLResult(Event):
+    """Text-to-SQL event."""
+    sql_query: str
+
 
 class DatabaseConnection(BaseModel):
     """Database connection information."""
