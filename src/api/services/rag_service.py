@@ -99,7 +99,7 @@ class TextToSQLPromptStrategy(IPromptStrategy):
             You are required to use the following format, \
             each taking one line:
 
-            Question: Question here
+            Natural Language Query: Natural Language Query here
             SQLQuery: SQL Query to run
             SQLResult: Result of the SQLQuery
             Answer (In Portuguese): Final answer here
@@ -109,7 +109,7 @@ class TextToSQLPromptStrategy(IPromptStrategy):
 
 
             Question: {query_str}
-            SQLQuery: \
+            Answer:
 """
 
     def create_prompt(self, kwargs: Any) -> str:
@@ -121,7 +121,7 @@ class TextToSQLPromptStrategy(IPromptStrategy):
         return "text_to_sql"
 
     def function_schema(self) -> dict:
-        return schemas.TextToSQLEvent.model_json_schema()
+        return schemas.TextToSQLResult.model_json_schema()
     
 class SchemaSummaryPromptStrategy(IPromptStrategy):
     def __init__(self, database):
@@ -151,7 +151,7 @@ class OptimizesSQLQueryPromptStrategy(IPromptStrategy):
             "Schema Information:\n{context}\n"
             "Database: {database}\n" 
             "Query: {query}\n"
-            "Answer (In Portuguese): \n"
+            "Answer (Generate the explanation for the optimized query in brazilian portuguese): \n"
         )
         return PromptTemplate(
             optimize_sql_query_prompt,
@@ -179,7 +179,7 @@ class ExplainSQLQueryPromptStrategy(IPromptStrategy):
             "Schema Information:\n{context}\n"
             "Database: {database}\n" 
             "Query: {query}\n"
-            "Explanation (In Portuguese): \n"
+            "Explanation (Generate the explanation in brazilian portuguese): \n"
         )
         return PromptTemplate(
             explain_sql_query_prompt,
@@ -207,7 +207,7 @@ class FixSQLQueryPromptStrategy(IPromptStrategy):
             "Schema Information:\n{context}\n"
             "Database: {database}\n" 
             "Query: {query}\n"
-            "Answer (In Portuguese): \n"
+            "Answer (Generate the fix explanation in brazilian portuguese): \n"
         )
         return PromptTemplate(
             optimize_sql_query_prompt,
@@ -307,7 +307,7 @@ class OpenAISQLGenerator:
         func_call = response.choices[0].message.function_call
         result_json = func_call.arguments
         result_model = {
-            "text_to_sql": schemas.TextToSQLEvent,
+            "text_to_sql": schemas.TextToSQLResult,
             "synthesize_response": schemas.SynthesisResult,
             "optimize_sql": schemas.OptimizeResult,
             "explain_sql": schemas.ExplainSQLResult,
@@ -642,7 +642,10 @@ class TextToSQLWorkflow(Workflow):
         match self.prompt_type:
             case "text_to_sql":
                 response_event = self.sql_generator.generate(kwargs)
-                return response_event
+                return schemas.TextToSQLEvent(
+                    sql_query=response_event.sql_query,
+                    natural_language_query=ev.query
+                )
 
             case "optimize_sql":
                 chat_response = self.sql_generator.generate(kwargs)
