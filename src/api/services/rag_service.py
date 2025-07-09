@@ -151,7 +151,7 @@ class OptimizesSQLQueryPromptStrategy(IPromptStrategy):
             "Schema Information:\n{context}\n"
             "Database: {database}\n" 
             "Query: {query}\n"
-            "Answer (Generate the explanation for the optimized query in brazilian portuguese): \n"
+            "Answer (The explanation for the optimized query need to be in portuguese): \n"
         )
         return PromptTemplate(
             optimize_sql_query_prompt,
