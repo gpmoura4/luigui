@@ -32,31 +32,25 @@ Este projeto apresenta várias técnicas interessantes que aprimoram as prática
 
 Além dos frameworks principais Django e Next.js, Luigui incorpora várias tecnologias e bibliotecas que podem ser de particular interesse para desenvolvedores experientes:
 
-*   **PostgreSQL + PGVector**: Utilizado para armazenamento de dados e vetores. A extensão PGVector permite o armazenamento eficiente de embeddings de alta dimensão, essencial para a funcionalidade RAG. [Documentação do PostgreSQL](https://www.postgresql.org/docs/) e [PGVector](https://github.com/pgvector/pgvector).
+*   **PostgreSQL + PGVector**: Utilizado para armazenamento de dados e vetores. A extensão PGVector permite o armazenamento eficiente de embeddings de alta dimensão, esse=ncial para a funcionalidade RAG.
 
-*   **LlamaIndex**: Uma estrutura de dados flexível e extensível para construir aplicações de LLM. No Luigui, é usado para o pipeline RAG com embeddings dos esquemas de tabelas, garantindo que o modelo tenha acesso ao contexto correto do banco de dados. [Site oficial do LlamaIndex](https://www.llamaindex.ai/).
+*   **LlamaIndex**: Uma estrutura de dados flexível e extensível para construir aplicações de LLM. No Luigui, é usado para o pipeline RAG com embeddings dos esquemas de tabelas, garantindo que o modelo tenha acesso ao contexto correto do banco de dados.
 
-*   **API da OpenAI**: A interface para interagir com os modelos de linguagem da OpenAI, que são a base para a funcionalidade de IA Generativa do Luigui. [Documentação da OpenAI API](https://platform.openai.com/docs/introduction).
+*   **API da OpenAI**: A interface para interagir com os modelos de linguagem da OpenAI, que são a base para a funcionalidade de IA Generativa do Luigui.
 
-*   **Shadcn/UI**: Um conjunto de componentes de interface de usuário reutilizáveis e acessíveis, construídos com Tailwind CSS e Radix UI. É provável que seja usado no frontend Next.js para criar uma experiência de usuário moderna e responsiva. [Site oficial do Shadcn/UI](https://ui.shadcn.com/).
+*   **Shadcn/UI**: Um conjunto de componentes de interface de usuário reutilizáveis e acessíveis, construídos com Tailwind CSS e Radix UI. É provável que seja usado no frontend Next.js para criar uma experiência de usuário moderna e responsiva.
 
-*   **Argon Dashboard**: Este projeto usa o Argon Dashboard, um template de administração Bootstrap 4 gratuito, para sua UI. Ele fornece um rico conjunto de componentes pré-construídos e um design moderno, acelerando o desenvolvimento frontend. [Explore o Argon Dashboard](https://www.creative-tim.com/product/argon-dashboard-django).
+*   **uv**: A presença de `pyproject.toml` e `requirements.txt` sugere o uso de `uv`, um instalador e resolvedor de pacotes Python rápido. Isso pode acelerar significativamente o gerenciamento de dependências para o backend Python.
 
-*   **Gulp**: Um kit de ferramentas JavaScript usado para automatizar tarefas demoradas no fluxo de trabalho de desenvolvimento, como compilação SCSS, minificação e recarregamento ao vivo. [Site oficial do Gulp.js](https://gulpjs.com/).
+*   **psycopg2**: Este é o adaptador PostgreSQL para Python. Sua presença indica que o backend Django é projetado para funcionar com bancos de dados PostgreSQL. [Documentação do psycopg2.
 
-*   **uv**: A presença de `pyproject.toml` e `requirements.txt` sugere o uso de `uv`, um instalador e resolvedor de pacotes Python rápido. Isso pode acelerar significativamente o gerenciamento de dependências para o backend Python. [Repositório uv no GitHub](https://github.com/astral-sh/uv).
+*   **Django REST Framework**: A estrutura do diretório `api` com `serializer.py`, `views.py` e `urls.py` indica que o Django REST Framework (DRF) é usado para construir APIs web robustas e escaláveis para o backend. O DRF simplifica a criação de APIs RESTful sobre o Django.
 
-*   **psycopg2**: Este é o adaptador PostgreSQL para Python. Sua presença indica que o backend Django é projetado para funcionar com bancos de dados PostgreSQL. [Documentação do psycopg2](https://www.psycopg.org/docs/).
+*   **Next.js**: Um framework React para construir aplicações web renderizadas no lado do servidor (SSR) e geradas estaticamente. Ele fornece recursos como roteamento baseado em sistema de arquivos, rotas de API e tratamento otimizado de imagens.
 
-*   **Pillow**: Uma ramificação amigável da PIL (Python Imaging Library), Pillow adiciona recursos de processamento de imagem ao Python. É comumente usado em projetos Django para tarefas como redimensionamento, corte e adição de marcas d'água a imagens. [Documentação do Pillow](https://pillow.readthedocs.io/en/stable/).
+*   **Tailwind CSS**: O arquivo `tailwind.config.ts` no diretório `gui` sugere o uso de Tailwind CSS, um framework CSS utilitário. Ele permite o desenvolvimento rápido de UI, fornecendo classes de utilidade de baixo nível diretamente na marcação.
 
-*   **Django REST Framework**: A estrutura do diretório `api` com `serializer.py`, `views.py` e `urls.py` indica que o Django REST Framework (DRF) é usado para construir APIs web robustas e escaláveis para o backend. O DRF simplifica a criação de APIs RESTful sobre o Django. [Documentação do Django REST Framework](https://www.django-rest-framework.org/).
-
-*   **Next.js**: Um framework React para construir aplicações web renderizadas no lado do servidor (SSR) e geradas estaticamente. Ele fornece recursos como roteamento baseado em sistema de arquivos, rotas de API e tratamento otimizado de imagens. [Site oficial do Next.js](https://nextjs.org/).
-
-*   **Tailwind CSS**: O arquivo `tailwind.config.ts` no diretório `gui` sugere o uso de Tailwind CSS, um framework CSS utilitário. Ele permite o desenvolvimento rápido de UI, fornecendo classes de utilidade de baixo nível diretamente na marcação. [Site oficial do Tailwind CSS](https://tailwindcss.com/).
-
-*   **TypeScript**: A presença de arquivos `.ts` e `.tsx` no diretório `gui` indica que o frontend é desenvolvido usando TypeScript, um superconjunto de JavaScript que adiciona tipagem estática. Isso aprimora a qualidade do código, a manutenibilidade e a experiência do desenvolvedor. [Site oficial do TypeScript](https://www.typescriptlang.org/).
+*   **TypeScript**: A presença de arquivos `.ts` e `.tsx` no diretório `gui` indica que o frontend é desenvolvido usando TypeScript, um superconjunto de JavaScript que adiciona tipagem estática. Isso aprimora a qualidade do código, a manutenibilidade e a experiência do desenvolvedor.
 
 
 
