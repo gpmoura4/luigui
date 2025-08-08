@@ -13,19 +13,17 @@ Para tornar isso possível, Luigui combina o poder da Inteligência Artificial G
 
 Este projeto apresenta várias técnicas interessantes que aprimoram as práticas de desenvolvimento web e a interação com dados:
 
-*   **Arquitetura Full-Stack (Django & Next.js)**: Luigui emprega uma arquitetura full-stack desacoplada. Django alimenta a robusta API de backend, lidando com a lógica de dados e servindo como um provedor de API RESTful. Next.js, um framework React, constrói a GUI interativa e performática de frontend. Essa separação permite o desenvolvimento e a escalabilidade independentes de ambas as camadas. [Saiba mais sobre Django](https://docs.djangoproject.com/en/stable/) e [Next.js](https://nextjs.org/docs).
+*   **Arquitetura Full-Stack (Django & Next.js)**: Luigui emprega uma arquitetura full-stack desacoplada. Django alimenta a robusta API de backend, lidando com a lógica de dados e servindo como um provedor de API RESTful. Next.js, um framework React, constrói a GUI interativa e performática de frontend. Essa separação permite o desenvolvimento e a escalabilidade independentes de ambas as camadas.
 
-*   **Interface Text-to-SQL com IA Generativa e RAG**: Uma característica central do Luigui é sua capacidade de traduzir linguagem natural em consultas SQL. Isso é alcançado através da combinação de Large Language Models (LLMs) com a técnica de Retrieval-Augmented Generation (RAG). O RAG permite que o modelo acesse e utilize o contexto real dos esquemas de banco de dados, garantindo que as consultas SQL geradas sejam precisas e relevantes. [Entenda mais sobre RAG](https://www.llamaindex.ai/blog/retrieval-augmented-generation-rag-from-theory-to-practice-in-llamaindex).
+*   **Interface Text-to-SQL com IA Generativa e RAG**: Uma característica central do Luigui é sua capacidade de traduzir linguagem natural em consultas SQL. Isso é alcançado através da combinação de Large Language Models (LLMs) com a técnica de Retrieval-Augmented Generation (RAG). O RAG permite que o modelo acesse e utilize o contexto real dos esquemas de banco de dados, garantindo que as consultas SQL geradas sejam precisas e relevantes. 
 
-*   **Aplicativos Django Modulares**: O backend Django é estruturado em aplicativos modulares (por exemplo, `api`, `src/core`). Isso promove a reutilização de código, a manutenibilidade e a escalabilidade, dividindo o aplicativo em componentes menores e gerenciáveis. [Saiba mais sobre aplicativos Django](https://docs.djangoproject.com/en/stable/intro/tutorial01/#creating-polls-app).
+*   **Aplicativos Django Modulares**: O backend Django é estruturado em aplicativos modulares (por exemplo, `api`, `src/core`). Isso promove a reutilização de código, a manutenibilidade e a escalabilidade, dividindo o aplicativo em componentes menores e gerenciáveis.
 
-*   **Compilação SCSS com Gulp**: O projeto utiliza Gulp para compilar arquivos SCSS em CSS, otimizando o fluxo de trabalho de estilo. Isso permite um CSS mais organizado e manutenível com recursos como variáveis, aninhamento e mixins. [Explore Gulp](https://gulpjs.com/) e [SCSS (Sass)](https://sass-lang.com/documentation/scss).
+*   **Compilação SCSS com Gulp**: O projeto utiliza Gulp para compilar arquivos SCSS em CSS, otimizando o fluxo de trabalho de estilo. Isso permite um CSS mais organizado e manutenível com recursos como variáveis, aninhamento e mixins. 
 
-*   **Containerização com Docker**: Toda a aplicação (componentes Django e Next.js) é containerizada usando Docker. Isso proporciona um ambiente consistente e isolado para desenvolvimento, teste e implantação, eliminando problemas de "funciona na minha máquina" e simplificando a implantação. [Aprofunde-se no Docker](https://docs.docker.com/get-started/).
+*   **Containerização com Docker**: Toda a aplicação (componentes Django e Next.js) é containerizada usando Docker. Isso proporciona um ambiente consistente e isolado para desenvolvimento, teste e implantação, eliminando problemas de "funciona na minha máquina" e simplificando a implantação.
 
-*   **Implantação com Gunicorn e Nginx**: O backend Django é configurado para implantação em produção usando Gunicorn como um servidor HTTP WSGI e Nginx como um proxy reverso. Essa configuração é altamente performática e escalável para servir aplicativos Django. [Saiba mais sobre Gunicorn](https://gunicorn.org/) e [Nginx](https://nginx.org/en/docs/).
-
-
+*   **Implantação com Gunicorn e Nginx**: O backend Django é configurado para implantação em produção usando Gunicorn como um servidor HTTP WSGI e Nginx como um proxy reverso. Essa configuração é altamente performática e escalável para servir aplicativos Django.
 
 
 ## Tecnologias e Bibliotecas Não Óbvias
