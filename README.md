@@ -1,66 +1,92 @@
-# Luigui: Uma Aplicação Web Baseada em Django
+# Luigui: Democratizando o Acesso a Dados com IA Generativa
 
-Luigui é uma aplicação web construída sobre o framework Django, projetada para fornecer uma base robusta e escalável para vários projetos web. Ela aproveita uma arquitetura modular, integrando um design moderno do Bootstrap 4 do Argon Dashboard. Este projeto enfatiza código limpo, autenticação baseada em sessão e prontidão para implantação com Docker e Gunicorn/Nginx.
+Luigui é um sistema web inovador que permite a qualquer pessoa, mesmo sem conhecimento técnico, consultar bancos de dados utilizando apenas linguagem natural. Desenvolvido como um projeto de TCC, Luigui visa democratizar o acesso a dados estruturados em empresas e instituições, tornando o uso de bancos de dados mais acessível para áreas como RH, educação e marketing.
+
+Por exemplo, você pode perguntar: "Quais alunos estão matriculados na turma de Estruturas de Dados?" e Luigui gerará automaticamente uma consulta SQL pronta para ser executada.
+
+Para tornar isso possível, Luigui combina o poder da Inteligência Artificial Generativa, utilizando Large Language Models (LLMs) com a técnica de Retrieval-Augmented Generation (RAG). Essa combinação garante que o modelo tenha acesso ao contexto real dos dados antes de gerar a query, reduzindo erros e aumentando a precisão das respostas.
 
 
 
 
 ## Técnicas Interessantes
 
-Este projeto apresenta várias técnicas interessantes que aprimoram as práticas de desenvolvimento web:
+Este projeto apresenta várias técnicas interessantes que aprimoram as práticas de desenvolvimento web e a interação com dados:
 
-*   **Aplicativos Django Modulares**: O projeto é estruturado em aplicativos Django modulares (por exemplo, `api`, `apps/authentication`, `apps/home`). Isso promove a reutilização de código, a manutenibilidade e a escalabilidade, dividindo o aplicativo em componentes menores e gerenciáveis. [Saiba mais sobre aplicativos Django](https://docs.djangoproject.com/en/stable/intro/tutorial01/#creating-polls-app).
+*   **Arquitetura Full-Stack (Django & Next.js)**: Luigui emprega uma arquitetura full-stack desacoplada. Django alimenta a robusta API de backend, lidando com a lógica de dados e servindo como um provedor de API RESTful. Next.js, um framework React, constrói a GUI interativa e performática de frontend. Essa separação permite o desenvolvimento e a escalabilidade independentes de ambas as camadas. [Saiba mais sobre Django](https://docs.djangoproject.com/en/stable/) e [Next.js](https://nextjs.org/docs).
 
-*   **Compilação SCSS com Gulp**: Utiliza Gulp para compilar arquivos SCSS em CSS. Isso simplifica o fluxo de trabalho de estilo, permitindo que os desenvolvedores escrevam CSS mais organizado e manutenível com recursos como variáveis, aninhamento e mixins. [Explore Gulp](https://gulpjs.com/) e [SCSS (Sass)](https://sass-lang.com/documentation/scss).
+*   **Interface Text-to-SQL com IA Generativa e RAG**: Uma característica central do Luigui é sua capacidade de traduzir linguagem natural em consultas SQL. Isso é alcançado através da combinação de Large Language Models (LLMs) com a técnica de Retrieval-Augmented Generation (RAG). O RAG permite que o modelo acesse e utilize o contexto real dos esquemas de banco de dados, garantindo que as consultas SQL geradas sejam precisas e relevantes. [Entenda mais sobre RAG](https://www.llamaindex.ai/blog/retrieval-augmented-generation-rag-from-theory-to-practice-in-llamaindex).
 
-*   **Autenticação Baseada em Sessão**: Implementa autenticação segura baseada em sessão, uma prática padrão para gerenciar sessões de usuário e garantir a integridade dos dados. [Entenda o gerenciamento de sessão no Django](https://docs.djangoproject.com/en/stable/topics/auth/default/#session-authentication).
+*   **Aplicativos Django Modulares**: O backend Django é estruturado em aplicativos modulares (por exemplo, `api`, `src/core`). Isso promove a reutilização de código, a manutenibilidade e a escalabilidade, dividindo o aplicativo em componentes menores e gerenciáveis. [Saiba mais sobre aplicativos Django](https://docs.djangoproject.com/en/stable/intro/tutorial01/#creating-polls-app).
 
-*   **Containerização com Docker**: O aplicativo é containerizado usando Docker, fornecendo um ambiente consistente e isolado para desenvolvimento, teste e implantação. Isso elimina problemas de "funciona na minha máquina" e simplifica a implantação. [Aprofunde-se no Docker](https://docs.docker.com/get-started/).
+*   **Compilação SCSS com Gulp**: O projeto utiliza Gulp para compilar arquivos SCSS em CSS, otimizando o fluxo de trabalho de estilo. Isso permite um CSS mais organizado e manutenível com recursos como variáveis, aninhamento e mixins. [Explore Gulp](https://gulpjs.com/) e [SCSS (Sass)](https://sass-lang.com/documentation/scss).
 
-*   **Implantação com Gunicorn e Nginx**: Configurado para implantação em produção usando Gunicorn como um servidor HTTP WSGI e Nginx como um proxy reverso. Essa configuração é altamente performática e escalável para servir aplicativos Django. [Saiba mais sobre Gunicorn](https://gunicorn.org/) e [Nginx](https://nginx.org/en/docs/).
+*   **Containerização com Docker**: Toda a aplicação (componentes Django e Next.js) é containerizada usando Docker. Isso proporciona um ambiente consistente e isolado para desenvolvimento, teste e implantação, eliminando problemas de "funciona na minha máquina" e simplificando a implantação. [Aprofunde-se no Docker](https://docs.docker.com/get-started/).
+
+*   **Implantação com Gunicorn e Nginx**: O backend Django é configurado para implantação em produção usando Gunicorn como um servidor HTTP WSGI e Nginx como um proxy reverso. Essa configuração é altamente performática e escalável para servir aplicativos Django. [Saiba mais sobre Gunicorn](https://gunicorn.org/) e [Nginx](https://nginx.org/en/docs/).
 
 
 
 
 ## Tecnologias e Bibliotecas Não Óbvias
 
-Além do framework Django principal, Luigui incorpora várias tecnologias e bibliotecas que podem ser de particular interesse para desenvolvedores experientes:
+Além dos frameworks principais Django e Next.js, Luigui incorpora várias tecnologias e bibliotecas que podem ser de particular interesse para desenvolvedores experientes:
 
-*   **Argon Dashboard**: Este projeto usa o Argon Dashboard, um template de administração Bootstrap 4 gratuito, para sua interface de usuário. Ele fornece um rico conjunto de componentes pré-construídos e um design moderno, acelerando o desenvolvimento frontend. [Explore o Argon Dashboard](https://www.creative-tim.com/product/argon-dashboard-django).
+*   **PostgreSQL + PGVector**: Utilizado para armazenamento de dados e vetores. A extensão PGVector permite o armazenamento eficiente de embeddings de alta dimensão, essencial para a funcionalidade RAG. [Documentação do PostgreSQL](https://www.postgresql.org/docs/) e [PGVector](https://github.com/pgvector/pgvector).
+
+*   **LlamaIndex**: Uma estrutura de dados flexível e extensível para construir aplicações de LLM. No Luigui, é usado para o pipeline RAG com embeddings dos esquemas de tabelas, garantindo que o modelo tenha acesso ao contexto correto do banco de dados. [Site oficial do LlamaIndex](https://www.llamaindex.ai/).
+
+*   **API da OpenAI**: A interface para interagir com os modelos de linguagem da OpenAI, que são a base para a funcionalidade de IA Generativa do Luigui. [Documentação da OpenAI API](https://platform.openai.com/docs/introduction).
+
+*   **Shadcn/UI**: Um conjunto de componentes de interface de usuário reutilizáveis e acessíveis, construídos com Tailwind CSS e Radix UI. É provável que seja usado no frontend Next.js para criar uma experiência de usuário moderna e responsiva. [Site oficial do Shadcn/UI](https://ui.shadcn.com/).
+
+*   **Argon Dashboard**: Este projeto usa o Argon Dashboard, um template de administração Bootstrap 4 gratuito, para sua UI. Ele fornece um rico conjunto de componentes pré-construídos e um design moderno, acelerando o desenvolvimento frontend. [Explore o Argon Dashboard](https://www.creative-tim.com/product/argon-dashboard-django).
 
 *   **Gulp**: Um kit de ferramentas JavaScript usado para automatizar tarefas demoradas no fluxo de trabalho de desenvolvimento, como compilação SCSS, minificação e recarregamento ao vivo. [Site oficial do Gulp.js](https://gulpjs.com/).
 
-*   **uv**: Embora não explicitamente detalhado no conteúdo do diretório `src` fornecido, os arquivos `pyproject.toml` e `requirements.txt` sugerem o uso de `uv`, um instalador e resolvedor de pacotes Python rápido. Isso pode acelerar significativamente o gerenciamento de dependências. [Repositório uv no GitHub](https://github.com/astral-sh/uv).
+*   **uv**: A presença de `pyproject.toml` e `requirements.txt` sugere o uso de `uv`, um instalador e resolvedor de pacotes Python rápido. Isso pode acelerar significativamente o gerenciamento de dependências para o backend Python. [Repositório uv no GitHub](https://github.com/astral-sh/uv).
 
-*   **psycopg2**: Este é o adaptador PostgreSQL para Python. Sua presença indica que o projeto foi projetado para funcionar com bancos de dados PostgreSQL, um poderoso sistema de banco de dados objeto-relacional de código aberto. [Documentação do psycopg2](https://www.psycopg.org/docs/).
+*   **psycopg2**: Este é o adaptador PostgreSQL para Python. Sua presença indica que o backend Django é projetado para funcionar com bancos de dados PostgreSQL. [Documentação do psycopg2](https://www.psycopg.org/docs/).
 
-*   **Pillow**: Uma ramificação amigável da PIL (Python Imaging Library), Pillow adiciona recursos de processamento de imagem ao Python. É comumente usado para tarefas como redimensionamento, corte e adição de marcas d'água a imagens. [Documentação do Pillow](https://pillow.readthedocs.io/en/stable/).
+*   **Pillow**: Uma ramificação amigável da PIL (Python Imaging Library), Pillow adiciona recursos de processamento de imagem ao Python. É comumente usado em projetos Django para tarefas como redimensionamento, corte e adição de marcas d'água a imagens. [Documentação do Pillow](https://pillow.readthedocs.io/en/stable/).
 
-*   **Django REST Framework**: Dada a estrutura do diretório `api` com `serializer.py`, `views.py` e `urls.py`, é altamente provável que o Django REST Framework (DRF) seja usado para construir APIs web robustas e escaláveis. O DRF simplifica a criação de APIs RESTful sobre o Django. [Documentação do Django REST Framework](https://www.django-rest-framework.org/).
+*   **Django REST Framework**: A estrutura do diretório `api` com `serializer.py`, `views.py` e `urls.py` indica que o Django REST Framework (DRF) é usado para construir APIs web robustas e escaláveis para o backend. O DRF simplifica a criação de APIs RESTful sobre o Django. [Documentação do Django REST Framework](https://www.django-rest-framework.org/).
+
+*   **Next.js**: Um framework React para construir aplicações web renderizadas no lado do servidor (SSR) e geradas estaticamente. Ele fornece recursos como roteamento baseado em sistema de arquivos, rotas de API e tratamento otimizado de imagens. [Site oficial do Next.js](https://nextjs.org/).
+
+*   **Tailwind CSS**: O arquivo `tailwind.config.ts` no diretório `gui` sugere o uso de Tailwind CSS, um framework CSS utilitário. Ele permite o desenvolvimento rápido de UI, fornecendo classes de utilidade de baixo nível diretamente na marcação. [Site oficial do Tailwind CSS](https://tailwindcss.com/).
+
+*   **TypeScript**: A presença de arquivos `.ts` e `.tsx` no diretório `gui` indica que o frontend é desenvolvido usando TypeScript, um superconjunto de JavaScript que adiciona tipagem estática. Isso aprimora a qualidade do código, a manutenibilidade e a experiência do desenvolvedor. [Site oficial do TypeScript](https://www.typescriptlang.org/).
 
 
 
 
 ## Estrutura do Projeto
 
-O projeto segue uma estrutura bem organizada, típica para aplicações Django, com clara separação de responsabilidades:
+O projeto segue uma estrutura bem organizada, típica para aplicações full-stack, com clara separação de responsabilidades entre o backend Django e o frontend Next.js:
 
 ```
 .
+├── gui/
+│   ├── app/
+│   │   ├── databases/
+│   │   ├── login/
+│   │   ├── queries/
+│   │   ├── register/
+│   │   └── templates/
+│   ├── components/
+│   ├── config/
+│   ├── contexts/
+│   ├── hooks/
+│   ├── public/
+│   ├── services/
+│   └── styles/
 ├── scripts/
 ├── src/
 │   ├── api/
 │   │   ├── migrations/
 │   │   └── services/
-│   ├── apps/
-│   │   ├── authentication/
-│   │   ├── home/
-│   │   ├── static/
-│   │   └── templates/
-│   ├── core/
-│   ├── media/
-│   ├── nginx/
-│   └── staticfiles/
+│   └── core/
 ├── .env.example
 ├── .gitignore
 ├── .python-version
@@ -72,21 +98,39 @@ O projeto segue uma estrutura bem organizada, típica para aplicações Django, 
 
 ### Descrições dos Diretórios
 
+*   **`gui/`**: Este diretório contém a aplicação frontend Next.js.
+    *   **`gui/app/`**: Lógica central da aplicação e páginas para o aplicativo Next.js.
+        *   **`gui/app/databases/`**: Provavelmente lida com interações ou configurações relacionadas ao banco de dados específicas do frontend.
+        *   **`gui/app/login/`**: Contém componentes e lógica para o login do usuário.
+        *   **`gui/app/queries/`**: Gerencia a busca de dados e consultas da API de backend.
+        *   **`gui/app/register/`**: Contém componentes e lógica para o registro do usuário.
+        *   **`gui/app/templates/`**: Modelos de frontend ou componentes de layout.
+    *   **`gui/components/`**: Componentes de UI reutilizáveis para a aplicação Next.js.
+    *   **`gui/config/`**: Arquivos de configuração do frontend.
+    *   **`gui/contexts/`**: Implementações da React Context API para gerenciamento de estado global.
+    *   **`gui/hooks/`**: Hooks React personalizados para lógica reutilizável.
+    *   **`gui/public/`**: Ativos estáticos servidos diretamente pelo Next.js (por exemplo, imagens, fontes).
+    *   **`gui/services/`**: Serviços de frontend para interagir com a API de backend.
+    *   **`gui/styles/`**: Estilos globais ou definições de tema para a aplicação Next.js.
 *   **`scripts/`**: Contém vários scripts de utilidade para automação, configuração ou tarefas de implantação.
-*   **`src/`**: O diretório principal do código-fonte para o projeto Django.
-    *   **`src/api/`**: Abriga o código relacionado à API, provavelmente implementando endpoints RESTful usando o Django REST Framework. Isso inclui migrações de banco de dados (`migrations/`) e lógica específica de serviço (`services/`).
-    *   **`src/apps/`**: Contém aplicativos Django individuais que compõem o projeto.
-        *   **`src/apps/authentication/`**: Lida com a autenticação do usuário, incluindo login, registro e gerenciamento de sessão.
-        *   **`src/apps/home/`**: Provavelmente contém a lógica central do aplicativo e as visualizações para as partes principais da aplicação voltadas para o usuário.
-        *   **`src/apps/static/`**: Armazena ativos estáticos como CSS, JavaScript e imagens que são servidos diretamente pelo servidor web.
-        *   **`src/apps/templates/`**: Contém modelos HTML usados pelo Django para renderizar páginas web dinâmicas.
-    *   **`src/core/`**: Contém as configurações principais do projeto, configurações de URL e outras configurações globais.
-    *   **`src/media/`**: Destinado a arquivos de mídia enviados pelo usuário.
-    *   **`src/nginx/`**: Arquivos de configuração para o servidor web Nginx, usados para servir arquivos estáticos e proxy de requisições para o Gunicorn.
-    *   **`src/staticfiles/`**: Coleta todos os arquivos estáticos de vários aplicativos Django em um único local para um serviço eficiente em produção.
+*   **`src/`**: O diretório principal do código-fonte para o projeto backend Django.
+    *   **`src/api/`**: Abriga o código relacionado à API, implementando endpoints RESTful usando o Django REST Framework. Isso inclui migrações de banco de dados (`migrations/`) e lógica específica de serviço (`services/`), particularmente para funcionalidades text-to-SQL.
+    *   **`src/core/`**: Contém as configurações principais do projeto Django, configurações de URL e outras configurações globais.
 *   **`.env.example`**: Um arquivo de modelo para variáveis de ambiente, útil para configurar o aplicativo em diferentes ambientes.
-*   **`docker-compose.yml`**: Define o aplicativo Docker de múltiplos contêineres, orquestrando serviços como o aplicativo Django, PostgreSQL e Nginx.
+*   **`docker-compose.yml`**: Define o aplicativo Docker de múltiplos contêineres, orquestrando serviços como o aplicativo Django, Next.js e, potencialmente, um banco de dados.
 *   **`pyproject.toml`**: Arquivo de configuração para projetos Python, potencialmente usado por ferramentas como `uv` para gerenciamento de dependências e metadados do projeto.
-*   **`requirements.txt`**: Lista as dependências Python necessárias para o projeto, usadas por `pip` ou `uv` para instalação.
+*   **`requirements.txt`**: Lista as dependências Python necessárias para o backend Django, usadas por `pip` ou `uv` para instalação.
 
 
+
+## Tecnologias Utilizadas
+
+*   **Django** (backend)
+*   **Next.js**, **Tailwind CSS**, **Shadcn/UI** (frontend)
+*   **PostgreSQL** + **PGVector** (armazenamento de dados e vetores)
+*   **LlamaIndex** (pipeline RAG com embeddings dos esquemas de tabelas)
+*   **API da OpenAI**
+
+
+
+****
